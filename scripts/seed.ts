@@ -1,7 +1,7 @@
 // scripts/seed.ts
 import { db } from '../src/lib/firebase';
 import { initialPosts } from '../src/lib/data';
-import { collection, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { users } from '../src/lib/data';
 
 async function seedDatabase() {
@@ -24,10 +24,10 @@ async function seedDatabase() {
     // Firestore can't store Date objects with nested data like in comments, so convert to Timestamps
     const postDataForFirestore = {
         ...post,
-        timestamp: post.timestamp, // Firestore will convert this to a Timestamp
+        timestamp: Timestamp.fromDate(post.timestamp as Date), // Convert Date to Firestore Timestamp
         comments: post.comments.map(c => ({
             ...c,
-            timestamp: c.timestamp // Firestore will convert this as well
+            timestamp: Timestamp.fromDate(c.timestamp as Date) // Convert Date to Firestore Timestamp
         }))
     };
     const postRef = doc(postsCollection, post.id);

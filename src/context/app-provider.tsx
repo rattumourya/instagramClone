@@ -16,6 +16,7 @@ import {
   orderBy,
   arrayUnion,
   increment,
+  Timestamp,
 } from 'firebase/firestore';
 
 type NewPost = Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked' | 'user'> & { user: { username: string, avatarUrl: string } };
@@ -138,9 +139,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // This assumes we're only adding one comment at a time
         const newComment = updates.comments[updates.comments.length - 1];
         if (newComment) {
+            // Firestore does not allow serverTimestamp() in arrayUnion.
+            // We'll use the client-generated date for the optimistic update,
+            // and create a separate object for the Firestore update.
             const commentForFirestore = {
                 ...newComment,
-                timestamp: serverTimestamp()
+                timestamp: serverTimestamp() // Use the server timestamp for the database
             };
             updateDoc(postRef, { comments: arrayUnion(commentForFirestore) });
         }
