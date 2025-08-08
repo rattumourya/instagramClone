@@ -1,6 +1,4 @@
 
-import type { Timestamp } from 'firebase/firestore';
-
 export interface User {
   id: string; // This will be the Firebase Auth UID
   username: string;
@@ -17,7 +15,7 @@ export interface Comment {
   id: string;
   text: string;
   user: Pick<User, 'username' | 'avatarUrl'>;
-  timestamp: Date | Timestamp;
+  timestamp: Date;
 }
 
 export interface Post {
@@ -25,7 +23,7 @@ export interface Post {
   user: Pick<User, 'username' | 'avatarUrl'>;
   imageUrl: string;
   caption: string;
-  timestamp: Date | Timestamp;
+  timestamp: Date;
   likes: number;
   comments: Comment[];
   isLiked: boolean;

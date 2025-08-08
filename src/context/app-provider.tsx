@@ -70,11 +70,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const postsSnapshot = await getDocs(postsQuery);
       const postsList = postsSnapshot.docs.map(doc => {
         const data = doc.data();
+        // Convert Firestore Timestamps to JS Date objects
         return {
           id: doc.id,
           ...data,
-          timestamp: data.timestamp,
-          comments: data.comments.map((c: any) => ({...c, timestamp: c.timestamp}))
+          timestamp: (data.timestamp as Timestamp).toDate(),
+          comments: data.comments.map((c: any) => ({
+            ...c,
+            timestamp: (c.timestamp as Timestamp).toDate()
+          }))
         } as Post;
       });
       setPosts(postsList);
@@ -219,7 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
       updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
-    // Handle likes and other updates
+    // Handle likes and other updates from a callback
     } else if (typeof payload === 'function') {
         const updates = payload(postToUpdate);
         
