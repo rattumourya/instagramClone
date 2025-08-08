@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -68,39 +68,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    setLoading(true);
-
-    // Fetch all public data (users and posts)
     const fetchPublicData = async () => {
-        try {
-            const usersCollection = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersCollection);
-            const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setUsers(usersList);
+      try {
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setUsers(usersList);
 
-            const postsCollection = collection(db, 'posts');
-            const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-            const postsSnapshot = await getDocs(postsQuery);
-            const postsList = postsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    timestamp: (data.timestamp as Timestamp).toDate(),
-                    comments: (data.comments || []).map((c: any) => ({
-                        ...c,
-                        timestamp: (c.timestamp as Timestamp).toDate()
-                    }))
-                } as RawPost;
-            });
-            setRawPosts(postsList);
-        } catch (error) {
-            console.error("Error fetching public data:", error);
-        }
+        const postsCollection = collection(db, 'posts');
+        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+        const postsSnapshot = await getDocs(postsQuery);
+        const postsList = postsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                timestamp: (data.timestamp as Timestamp).toDate(),
+                comments: (data.comments || []).map((c: any) => ({
+                    ...c,
+                    timestamp: (c.timestamp as Timestamp).toDate()
+                }))
+            } as RawPost;
+        });
+        setRawPosts(postsList);
+      } catch (error) {
+        console.error("Error fetching public data:", error);
+      }
     };
-    
-    fetchPublicData();
 
+    fetchPublicData();
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -182,7 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    // State will be cleared by onAuthStateChanged
+    setCurrentUser(null);
     router.push('/login');
   };
 
@@ -233,7 +230,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       const newCommentForFirestore = {
-        ...newCommentForUI,
+        id: newCommentForUI.id,
+        text: newCommentForUI.text,
+        userId: newCommentForUI.userId,
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   

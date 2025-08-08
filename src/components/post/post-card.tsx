@@ -42,7 +42,7 @@ export function PostCard({ post }: { post: PostType }) {
         <div className="flex items-center gap-3 p-4">
           <Avatar className="h-9 w-9">
             <AvatarImage src={post.user.avatarUrl} alt={`@${post.user.username}`} />
-            <AvatarFallback>{post.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>{post.user.username}</AvatarFallback>
           </Avatar>
           <Link href={`/${post.user.username}`} className="font-semibold text-sm hover:underline">
             {post.user.username}
