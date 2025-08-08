@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -17,24 +18,39 @@ import {
 import { Input } from '@/components/ui/input';
 import { Camera } from 'lucide-react';
 import Link from 'next/link';
+import { useApp } from '@/context/app-provider';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
-  username: z.string().min(3, { message: 'Username must be at least 3 characters.'}),
+  username: z.string().min(3, { message: 'Username must be at least 3 characters.'}).max(20, { message: 'Username must be less than 20 characters.'}).regex(/^[a-zA-Z0-9_]+$/, { message: 'Username can only contain letters, numbers, and underscores.'}),
   password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
 });
 
 export function SignupForm() {
+  const { signUp } = useApp();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: '', username: '', password: '' },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    // Mock signup logic
-    router.push('/');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setLoading(true);
+    try {
+      await signUp(values.email, values.username, values.password);
+      // router.push is handled in the provider
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Sign Up Failed',
+        description: error.message || 'An unexpected error occurred.',
+      });
+      setLoading(false);
+    }
   }
 
   return (
@@ -57,7 +73,7 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
+                    <Input placeholder="name@example.com" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -70,7 +86,7 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="yourusername" {...field} />
+                    <Input placeholder="yourusername" {...field} disabled={loading}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -83,14 +99,14 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={loading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
         </Form>

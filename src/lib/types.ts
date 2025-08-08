@@ -2,9 +2,10 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export interface User {
-  id: string;
+  id: string; // This will be the Firebase Auth UID
   username: string;
   name: string;
+  email?: string; // Add email field
   avatarUrl: string;
   bio?: string;
   postsCount: number;

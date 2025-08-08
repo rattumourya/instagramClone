@@ -1,16 +1,19 @@
 "use client";
 
 import Link from 'next/link';
-import { Camera, Home, PlusSquare, Search, User } from 'lucide-react';
+import { Camera, Home, PlusSquare, Search, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UploadDialog } from '@/components/post/upload-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { useApp } from '@/context/app-provider';
 import { useRouter } from 'next/navigation';
 
 export function Header() {
     const router = useRouter();
+    const { currentUser, signOut } = useApp();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card">
       <div className="container mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
@@ -25,43 +28,49 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
-              <Home className="h-6 w-6" />
-              <span className="sr-only">Home</span>
-            </Link>
-          </Button>
-          
-          <UploadDialog>
-            <Button variant="ghost" size="icon">
-              <PlusSquare className="h-6 w-6" />
-              <span className="sr-only">New Post</span>
-            </Button>
-          </UploadDialog>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className='rounded-full'>
-                    <Avatar className='h-8 w-8'>
-                        <AvatarImage src='https://placehold.co/150x150.png' alt='@mona_lisa' data-ai-hint="avatar" />
-                        <AvatarFallback>ML</AvatarFallback>
-                    </Avatar>
+          { currentUser ? (
+            <>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/">
+                  <Home className="h-6 w-6" />
+                  <span className="sr-only">Home</span>
+                </Link>
+              </Button>
+              
+              <UploadDialog>
+                <Button variant="ghost" size="icon">
+                  <PlusSquare className="h-6 w-6" />
+                  <span className="sr-only">New Post</span>
                 </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/mona_lisa')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/login')}>
-                    <span>Log out</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </UploadDialog>
 
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className='rounded-full'>
+                        <Avatar className='h-8 w-8'>
+                            <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.username}`} data-ai-hint="avatar" />
+                            <AvatarFallback>{currentUser.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push(`/${currentUser.username}`)}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+             <Button onClick={() => router.push('/login')}>Log In</Button>
+          )}
         </div>
       </div>
     </header>

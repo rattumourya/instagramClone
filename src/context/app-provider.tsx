@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import {
   collection,
   getDocs,
@@ -17,7 +17,19 @@ import {
   arrayUnion,
   increment,
   Timestamp,
+  setDoc,
+  getDoc,
+  where
 } from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+
 
 type NewPost = Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked' | 'user'> & { user: { username: string, avatarUrl: string } };
 
@@ -27,8 +39,12 @@ interface AppContextType {
   posts: Post[];
   users: User[];
   currentUser: User | null;
+  loading: boolean;
   addPost: (post: Omit<NewPost, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => Promise<void>;
   updatePost: (postId: string, payload: UpdatePayload) => void;
+  signUp: (email: string, username: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -38,25 +54,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
+    const fetchAllUsers = async () => {
         const usersCollection = collection(db, 'users');
         const usersSnapshot = await getDocs(usersCollection);
         const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(usersList);
-        // For now, we'll mock the current user as the first user in the list.
-        if (usersList.length > 0) {
-          setCurrentUser(usersList[0]);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
     };
 
     const fetchPosts = async () => {
-      try {
         const postsCollection = collection(db, 'posts');
         const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
         const postsSnapshot = await getDocs(postsQuery);
@@ -70,25 +78,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as Post;
         });
         setPosts(postsList);
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-      }
     };
-
-    const fetchData = async () => {
+    
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
-      await fetchUsers();
-      await fetchPosts();
-      setLoading(false);
-    }
+      if (firebaseUser) {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setCurrentUser({ id: userSnap.id, ...userSnap.data() } as User);
+        } else {
+           // This case can happen if a user is created in auth but not in firestore
+           // For now we'll just log it. A more robust solution might create the doc here.
+           console.log("User document not found in Firestore for uid:", firebaseUser.uid);
+           setCurrentUser(null);
+        }
+        await fetchPosts();
+        await fetchAllUsers();
 
-    fetchData();
+      } else {
+        setCurrentUser(null);
+        setPosts([]);
+        setUsers([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const signUp = async (email: string, username: string, password: string) => {
+    // Check if username already exists
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where("username", "==", username));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      throw new Error("Username already exists.");
+    }
+    
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
+
+    const newUser: User = {
+      id: firebaseUser.uid,
+      username,
+      name: username, // Default name to username
+      email,
+      avatarUrl: 'https://placehold.co/150x150.png',
+      bio: '',
+      postsCount: 0,
+      followersCount: 0,
+      followingCount: 0,
+    };
+    
+    await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+    setCurrentUser(newUser);
+    router.push('/');
+  };
+
+  const signIn = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+    router.push('/');
+  };
+
+  const signOut = async () => {
+    await firebaseSignOut(auth);
+    router.push('/login');
+  };
+
 
   const addPost = async (post: Omit<NewPost, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => {
     if (!currentUser) return;
     try {
-      const newPostRef = await addDoc(collection(db, 'posts'), {
+      const newPostData = {
         ...post,
         user: {
           username: currentUser.username,
@@ -98,22 +160,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
         likes: 0,
         comments: [],
         isLiked: false,
-      });
+      };
 
-      // To keep UI in sync without re-fetching, we can optimistically update the state
-      const newPost: Post = {
-        ...post,
+      const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
+
+      // Optimistic update
+      const newPostForUI: Post = {
         id: newPostRef.id,
         user: {
           username: currentUser.username,
           avatarUrl: currentUser.avatarUrl
         },
+        imageUrl: post.imageUrl,
+        caption: post.caption,
         timestamp: new Date(),
         likes: 0,
         comments: [],
         isLiked: false,
       };
-      setPosts(prevPosts => [newPost, ...prevPosts]);
+      setPosts(prevPosts => [newPostForUI, ...prevPosts]);
 
     } catch (error) {
       console.error("Error adding post: ", error);
@@ -137,52 +202,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       const newCommentForFirestore = {
-        id: newCommentForUI.id,
-        text: payload.newComment,
-        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        ...newCommentForUI,
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
-      // Optimistic update for comments
       setPosts(prevPosts =>
         prevPosts.map(p =>
           p.id === postId ? { ...p, comments: [...p.comments, newCommentForUI] } : p
         )
       );
   
-      // Firestore update for comments
       updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
     // Handle likes and other updates
     } else if (typeof payload === 'function') {
-      const updates = payload(postToUpdate);
-      const newIsLiked = updates.isLiked;
+        const updates = payload(postToUpdate);
+        
+        // This part is now specifically for likes
+        const newIsLiked = updates.isLiked;
+        if (newIsLiked === undefined) return;
+
+        setPosts(prevPosts =>
+            prevPosts.map(p => {
+                if (p.id === postId) {
+                    const currentLikes = p.likes || 0;
+                    const newLikes = newIsLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+                    return { ...p, isLiked: newIsLiked, likes: newLikes };
+                }
+                return p;
+            })
+        );
   
-      // Optimistically update local state
-      setPosts(prevPosts =>
-        prevPosts.map(p => {
-          if (p.id === postId) {
-            const currentLikes = p.likes || 0;
-            const newLikes = newIsLiked === true ? currentLikes + 1 : newIsLiked === false ? Math.max(0, currentLikes - 1) : currentLikes;
-            return { ...p, ...updates, likes: newLikes };
-          }
-          return p;
-        })
-      );
-  
-      // Update Firestore
-      if (newIsLiked !== undefined) {
         updateDoc(postRef, {
-          likes: increment(newIsLiked ? 1 : -1),
-          isLiked: newIsLiked
+            likes: increment(newIsLiked ? 1 : -1)
         });
-      }
     }
   };
 
   return (
-    <AppContext.Provider value={{ posts, users, currentUser, addPost, updatePost }}>
-      {!loading ? children : <div>Loading...</div>}
+    <AppContext.Provider value={{ posts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
+      {children}
     </AppContext.Provider>
   );
 }
