@@ -26,7 +26,7 @@ export function PostCard({ post }: { post: PostType }) {
     const newLikesCount = newLikedState ? likes + 1 : likes - 1;
     setIsLiked(newLikedState);
     setLikes(newLikesCount);
-    updatePost({ ...post, isLiked: newLikedState, likes: newLikesCount, comments: comments });
+    updatePost({ ...post, isLiked: newLikedState, likes: newLikesCount, comments });
   };
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -40,6 +40,7 @@ export function PostCard({ post }: { post: PostType }) {
       };
       const updatedComments = [...comments, commentToAdd];
       setComments(updatedComments);
+      // Pass the current `likes` state directly to ensure it's up-to-date.
       updatePost({ ...post, comments: updatedComments, isLiked, likes });
       setNewComment('');
     }
