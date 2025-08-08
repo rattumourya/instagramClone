@@ -17,7 +17,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
   useEffect(() => {
-    if (users.length > 0) {
+    if (!loading && users.length > 0) {
       const foundUser = users.find(u => u.username === username);
       setUser(foundUser);
       if (foundUser) {
@@ -25,10 +25,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         setUserPosts(foundPosts);
       }
     }
-  }, [users, posts, username]);
+  }, [users, posts, username, loading]);
 
+  // Initial loading state while waiting for auth and data
   if (loading || (users.length === 0 && !user)) {
-    // Show a loading state or a skeleton component while user data is being fetched
     return (
       <main className="min-h-screen">
         <Header />
@@ -53,14 +53,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     );
   }
   
-  if (!loading && users.length > 0 && !user) {
+  // After loading, if the user is still not found, show 404
+  if (!user) {
     notFound();
   }
-  
-  if (!user) {
-      return null; // Should be caught by the loading or notFound states
-  }
-
 
   return (
     <main className="min-h-screen">
