@@ -5,9 +5,8 @@ import { Header } from '@/components/layout/header';
 import { PostGrid } from '@/components/post/post-grid';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { useApp } from '@/context/app-provider';
-import { useEffect, useState, useMemo } from 'react';
-import { User } from '@/lib/types';
-import { Post } from '@/lib/types';
+import { useMemo } from 'react';
+import type { User, Post } from '@/lib/types';
 
 const ProfilePageSkeleton = () => (
   <main className="min-h-screen">
@@ -41,19 +40,16 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage({ params }: { params: { username: string } }) {
   const { username } = params;
   const { users, posts, loading } = useApp();
-  const [user, setUser] = useState<User | null>(null);
 
-  const userPosts = useMemo(() => {
+  const user: User | undefined = useMemo(() => {
+    if (loading) return undefined;
+    return users.find(u => u.username === username);
+  }, [username, users, loading]);
+
+  const userPosts: Post[] = useMemo(() => {
     if (!user) return [];
     return posts.filter(p => p.userId === user.id);
   }, [posts, user]);
-
-  useEffect(() => {
-    if (!loading) {
-      const foundUser = users.find(u => u.username === username);
-      setUser(foundUser || null);
-    }
-  }, [username, users, loading]);
 
   if (loading) {
     return <ProfilePageSkeleton />;

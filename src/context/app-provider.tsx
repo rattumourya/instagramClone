@@ -104,38 +104,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       } catch (error) {
         console.error("Error fetching public data:", error);
-      }
-
-      // 2. After public data is fetched, set up the auth listener.
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        if (firebaseUser) {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (userSnap.exists()) {
-            const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
-            setCurrentUser(fetchedUser);
+      } finally {
+        // Set up the auth listener after fetching public data.
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+          if (firebaseUser) {
+            // This now uses the already-fetched user list if possible
+            const existingUser = users.find(u => u.id === firebaseUser.uid);
+            if (existingUser) {
+              setCurrentUser(existingUser);
+            } else {
+              // Fallback to fetch if user wasn't in the initial list for some reason
+              const userRef = doc(db, 'users', firebaseUser.uid);
+              const userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
+                setCurrentUser(fetchedUser);
+                // Also update the main users list to ensure consistency
+                setUsers(prev => [...prev.filter(u => u.id !== fetchedUser.id), fetchedUser]);
+              } else {
+                 console.error("Authenticated user not found in Firestore, signing out.");
+                 setCurrentUser(null);
+                 await firebaseSignOut(auth);
+              }
+            }
           } else {
-             console.error("Authenticated user not found in Firestore, signing out.");
-             setCurrentUser(null);
-             await firebaseSignOut(auth);
+            setCurrentUser(null);
           }
-        } else {
-          setCurrentUser(null);
-        }
-        // 3. Set loading to false only after all data is fetched and auth state is determined.
-        setLoading(false);
-      });
+          // Set loading to false only after all data is fetched and auth state is determined.
+          setLoading(false);
+        });
 
-      return () => unsubscribe();
+        return () => unsubscribe();
+      }
     };
 
     initializeApp();
-  }, []);
+  }, [users]); // Rerun if the user list gets updated from a fallback fetch.
   
   const posts = useMemo(() => {
-    // Memoization now correctly depends on all raw data and the current user.
-    if (users.length === 0) return [];
+    if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -155,10 +162,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...post,
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id },
-        isLiked: likedPostsSet.has(post.id) // `isLiked` is now correctly derived from the current user.
+        isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser]);
+  }, [rawPosts, users, currentUser, loading]);
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');
@@ -185,17 +192,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+    // setCurrentUser(newUser) is handled by onAuthStateChanged
     setUsers(prev => [...prev, newUser]);
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    // setCurrentUser is handled by onAuthStateChanged
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setCurrentUser(null);
     router.push('/login');
   };
 
