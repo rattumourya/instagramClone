@@ -11,12 +11,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
-import type { Post as PostType, Comment as CommentType } from '@/lib/types';
+import type { Post as PostType } from '@/lib/types';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 
 export function PostCard({ post }: { post: PostType }) {
-  const { updatePost, currentUser } = useApp();
+  const { updatePost } = useApp();
   const [newComment, setNewComment] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
 
@@ -30,17 +30,14 @@ export function PostCard({ post }: { post: PostType }) {
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (newComment.trim() && currentUser) {
-      const commentToAdd: CommentType = {
-        id: `comment-${Date.now()}`,
-        text: newComment.trim(),
-        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-        timestamp: new Date(),
-      };
-      
+    if (newComment.trim()) {
       updatePost(post.id, (currentPost) => ({
-          ...currentPost,
-          comments: [...currentPost.comments, commentToAdd]
+        ...currentPost,
+        comments: [
+            ...currentPost.comments,
+            // The app provider will construct the full comment object
+            { id: '', text: newComment.trim(), user: {username: '', avatarUrl: ''}, timestamp: new Date() }
+        ]
       }));
       setNewComment('');
     }
@@ -51,7 +48,7 @@ export function PostCard({ post }: { post: PostType }) {
   const getFormattedTimestamp = () => {
     if (!post.timestamp) return 'just now';
     const date = post.timestamp instanceof Timestamp ? post.timestamp.toDate() : post.timestamp;
-    return formatDistanceToNow(date, { addSuffix: true });
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
   }
 
   return (

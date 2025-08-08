@@ -119,35 +119,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePost = (postId: string, updater: (post: Post) => Partial<Post>) => {
+    if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
     const postToUpdate = posts.find(p => p.id === postId);
     if (!postToUpdate) return;
     
     const updates = updater(postToUpdate);
 
-    // Optimistically update local state
-    setPosts(prevPosts =>
-      prevPosts.map(p => p.id === postId ? { ...p, ...updates } : p)
-    );
+    // Optimistically update local state for likes
+    if (updates.isLiked !== undefined) {
+        setPosts(prevPosts =>
+            prevPosts.map(p => p.id === postId ? { ...p, ...updates } : p)
+        );
+    }
 
-    // Update Firestore
-    // Note: a more robust solution would handle potential failures and roll back optimistic updates.
+    // Update Firestore for likes
     if(updates.isLiked !== undefined){
         updateDoc(postRef, { likes: increment(updates.isLiked ? 1 : -1), isLiked: updates.isLiked });
     }
-    if (updates.comments) {
-        // This assumes we're only adding one comment at a time
-        const newComment = updates.comments[updates.comments.length - 1];
-        if (newComment) {
-            // Firestore does not allow serverTimestamp() in arrayUnion.
-            // We'll use the client-generated date for the optimistic update,
-            // and create a separate object for the Firestore update.
-            const commentForFirestore = {
-                ...newComment,
-                timestamp: serverTimestamp() // Use the server timestamp for the database
-            };
-            updateDoc(postRef, { comments: arrayUnion(commentForFirestore) });
-        }
+    
+    // Handle comments separately
+    if (updates.comments && updates.comments.length > postToUpdate.comments.length) {
+        const newCommentText = updates.comments[updates.comments.length - 1].text;
+        
+        // Optimistic update for comments
+        const commentForUI: Comment = {
+            id: `comment-${Date.now()}`,
+            text: newCommentText,
+            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+            timestamp: new Date(),
+        };
+        setPosts(prevPosts =>
+            prevPosts.map(p => p.id === postId ? { ...p, comments: [...p.comments, commentForUI] } : p)
+        );
+
+        // Firestore update for comments
+        const commentForFirestore = {
+            id: `comment-${Date.now()}-${Math.random()}`,
+            text: newCommentText,
+            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+            timestamp: serverTimestamp()
+        };
+        updateDoc(postRef, { comments: arrayUnion(commentForFirestore) });
     }
   };
 
