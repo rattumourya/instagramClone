@@ -69,7 +69,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Fetch all public data (users and posts) on initial load
   useEffect(() => {
     const fetchPublicData = async () => {
       setLoading(true);
@@ -101,16 +100,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRawPosts(postsList);
       } catch (error) {
         console.error("Error fetching public data:", error);
-      } finally {
-        // Auth listener will handle turning off loading state
       }
+      // Note: We don't setLoading(false) here. The auth listener will do that.
     };
     
     fetchPublicData();
-  }, []);
 
-  // Listen for auth changes
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -120,14 +115,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(fetchedUser);
         } else {
-           // This case can happen if a user is deleted from Firestore but not from Auth
            setCurrentUser(null);
            await firebaseSignOut(auth);
         }
       } else {
         setCurrentUser(null);
       }
-      // Only set loading to false once we know the auth state and have attempted to fetch public data
       setLoading(false); 
     });
 
@@ -135,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    if (users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -158,7 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser, loading]);
+  }, [rawPosts, users, currentUser]);
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');
@@ -331,3 +324,5 @@ export function useApp() {
   }
   return context;
 }
+
+    
