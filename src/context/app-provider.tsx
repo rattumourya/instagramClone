@@ -65,8 +65,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return {
             id: doc.id,
             ...data,
-            timestamp: data.timestamp?.toDate(), // Convert Firestore Timestamp to Date
-            comments: data.comments.map((c: any) => ({...c, timestamp: c.timestamp?.toDate()}))
+            timestamp: data.timestamp,
+            comments: data.comments.map((c: any) => ({...c, timestamp: c.timestamp}))
           } as Post;
         });
         setPosts(postsList);
@@ -123,47 +123,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePost = (postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
-
+    const postToUpdate = posts.find(p => p.id === postId);
+    if (!postToUpdate) return;
+  
     // Handle comments
     if (typeof payload === 'object' && 'newComment' in payload) {
-        const newCommentText = payload.newComment;
-        const newCommentTimestamp = new Date();
-        
-        const newComment: Comment = {
-            id: `comment-${Date.now()}-${Math.random()}`,
-            text: newCommentText,
-            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-            timestamp: newCommentTimestamp,
-        };
-
-        // Optimistic update for comments
-        setPosts(prevPosts =>
-            prevPosts.map(p => p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p)
-        );
-
-        // Firestore update for comments
-        updateDoc(postRef, { comments: arrayUnion(newComment) });
-
+      const newComment: Comment = {
+        id: `comment-${Date.now()}-${Math.random()}`,
+        text: payload.newComment,
+        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        timestamp: new Date(),
+      };
+  
+      // Optimistic update for comments
+      setPosts(prevPosts =>
+        prevPosts.map(p =>
+          p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p
+        )
+      );
+  
+      // Firestore update for comments
+      updateDoc(postRef, { comments: arrayUnion({ ...newComment, timestamp: serverTimestamp() }) });
+  
     // Handle likes and other updates
     } else if (typeof payload === 'function') {
-        const postToUpdate = posts.find(p => p.id === postId);
-        if (!postToUpdate) return;
-        const updates = payload(postToUpdate);
-
-        // Optimistically update local state
-        setPosts(prevPosts =>
-            prevPosts.map(p => p.id === postId ? { ...p, ...updates } : p)
-        );
-
-        // Update Firestore
-        const firestoreUpdates: Partial<Post> & {[key: string]: any} = {};
-        if (updates.isLiked !== undefined) {
-            firestoreUpdates.likes = increment(updates.isLiked ? 1 : -1);
-            firestoreUpdates.isLiked = updates.isLiked;
-        }
-        if (Object.keys(firestoreUpdates).length > 0) {
-            updateDoc(postRef, firestoreUpdates);
-        }
+      const updates = payload(postToUpdate);
+      const newIsLiked = updates.isLiked;
+  
+      // Optimistically update local state
+      setPosts(prevPosts =>
+        prevPosts.map(p => {
+          if (p.id === postId) {
+            const currentLikes = p.likes || 0;
+            const newLikes = newIsLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+            return { ...p, ...updates, likes: newLikes };
+          }
+          return p;
+        })
+      );
+  
+      // Update Firestore
+      if (newIsLiked !== undefined) {
+        updateDoc(postRef, {
+          likes: increment(newIsLiked ? 1 : -1),
+          isLiked: newIsLiked
+        });
+      }
     }
   };
 
