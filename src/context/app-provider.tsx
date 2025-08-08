@@ -5,10 +5,12 @@ import { createContext, useContext, useState } from 'react';
 import type { Post } from '@/lib/types';
 import { initialPosts } from '@/lib/data';
 
+type NewPost = Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'> & Partial<Pick<Post, 'likes' | 'comments' | 'isLiked'>>;
+
 interface AppContextType {
   posts: Post[];
-  addPost: (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => void;
-  updatePost: (updatedPost: Post) => void;
+  addPost: (post: NewPost) => void;
+  updatePost: (postId: string, updater: (post: Post) => Partial<Post>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -16,20 +18,28 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
 
-  const addPost = (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => {
+  const addPost = (post: NewPost) => {
     const newPost: Post = {
       ...post,
       id: `post-${Date.now()}`,
       timestamp: new Date(),
-      likes: 0,
-      comments: [],
-      isLiked: false,
+      likes: post.likes ?? 0,
+      comments: post.comments ?? [],
+      isLiked: post.isLiked ?? false,
     };
     setPosts(prevPosts => [newPost, ...prevPosts]);
   };
 
-  const updatePost = (updatedPost: Post) => {
-    setPosts(prevPosts => prevPosts.map(p => p.id === updatedPost.id ? updatedPost : p));
+  const updatePost = (postId: string, updater: (post: Post) => Partial<Post>) => {
+    setPosts(prevPosts => 
+      prevPosts.map(p => {
+        if (p.id === postId) {
+          const updates = updater(p);
+          return { ...p, ...updates };
+        }
+        return p;
+      })
+    );
   }
 
   return (

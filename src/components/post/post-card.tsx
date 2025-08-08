@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
-import type { Post as PostType, Comment } from '@/lib/types';
+import type { Post as PostType, Comment as CommentType } from '@/lib/types';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 
 export function PostCard({ post }: { post: PostType }) {
@@ -19,23 +19,27 @@ export function PostCard({ post }: { post: PostType }) {
   const [newComment, setNewComment] = useState('');
 
   const handleLike = () => {
-    updatePost({ 
-      ...post, 
-      isLiked: !post.isLiked,
-      likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-    });
+    updatePost(post.id, (currentPost) => ({
+      ...currentPost,
+      isLiked: !currentPost.isLiked,
+      likes: currentPost.isLiked ? currentPost.likes - 1 : currentPost.likes + 1,
+    }));
   };
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (newComment.trim()) {
-      const commentToAdd: Comment = {
+      const commentToAdd: CommentType = {
         id: `comment-${Date.now()}`,
         text: newComment,
         user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
         timestamp: new Date(),
       };
-      updatePost({ ...post, comments: [...post.comments, commentToAdd] });
+      
+      updatePost(post.id, (currentPost) => ({
+          ...currentPost,
+          comments: [...currentPost.comments, commentToAdd]
+      }));
       setNewComment('');
     }
   };
