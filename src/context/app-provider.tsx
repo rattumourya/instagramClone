@@ -87,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             id: doc.id,
             ...data,
             timestamp: (data.timestamp as Timestamp).toDate(),
+            media: data.media || [], // Ensure media is an array
             comments: (data.comments || []).map((c: any) => ({
               ...c,
               timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
@@ -191,9 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', fbUser.uid), newUser);
-    // This is the critical fix: update local state immediately
     setUsers(prev => [...prev, newUser]);
-    // setCurrentUser will be handled by the onAuthStateChanged listener
     router.push('/');
   };
 
@@ -309,7 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             likedPosts: newIsLiked ? arrayUnion(postId) : arrayRemove(postId)
         });
     }
-  }, [currentUser, posts, router]);
+  }, [currentUser, posts]);
 
   return (
     <AppContext.Provider value={{ posts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
@@ -325,7 +324,3 @@ export function useApp() {
   }
   return context;
 }
-
-    
-
-    
