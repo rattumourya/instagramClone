@@ -21,7 +21,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       const foundUser = users.find(u => u.username === username);
       setUser(foundUser);
       if (foundUser) {
-        const foundPosts = posts.filter(p => p.user.username === username);
+        const foundPosts = posts.filter(p => p.userId === foundUser.id);
         setUserPosts(foundPosts);
       }
     }

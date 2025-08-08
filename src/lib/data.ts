@@ -52,10 +52,10 @@ const mockComments: Comment[] = [
     },
 ];
 
-export const initialPosts: Post[] = [
+export const initialPosts: Omit<Post, 'user'>[] = [
   {
     id: 'post-1',
-    user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-1',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'Exploring the world through a new lens. Every day is a discovery.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
@@ -65,7 +65,7 @@ export const initialPosts: Post[] = [
   },
   {
     id: 'post-2',
-    user: { username: 'vincent_van_draw', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-2',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'Starry nights and city lights. Finding beauty in the chaos.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
@@ -75,7 +75,7 @@ export const initialPosts: Post[] = [
   },
   {
     id: 'post-3',
-    user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-1',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'Just another day in paradise. #blessed',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
@@ -85,7 +85,7 @@ export const initialPosts: Post[] = [
   },
   {
     id: 'post-4',
-    user: { username: 'tech_tesla', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-3',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'The future is now.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72),
@@ -95,7 +95,7 @@ export const initialPosts: Post[] = [
   },
   {
     id: 'post-5',
-    user: { username: 'vincent_van_draw', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-2',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'Lost in the details.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 96),
@@ -105,7 +105,7 @@ export const initialPosts: Post[] = [
   },
   {
     id: 'post-6',
-    user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
+    userId: 'user-1',
     imageUrl: 'https://placehold.co/600x600.png',
     caption: 'Coffee and code.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 120),

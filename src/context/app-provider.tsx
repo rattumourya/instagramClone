@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -31,7 +31,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 
-type NewPost = Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked' | 'user'> & { user: { username: string, avatarUrl: string } };
+type NewPost = { imageUrl: string, caption: string };
 
 type UpdatePayload = ((post: Post) => Partial<Post>) | { newComment: string };
 
@@ -40,7 +40,7 @@ interface AppContextType {
   users: User[];
   currentUser: User | null;
   loading: boolean;
-  addPost: (post: Omit<NewPost, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => Promise<void>;
+  addPost: (post: NewPost) => Promise<void>;
   updatePost: (postId: string, payload: UpdatePayload) => void;
   signUp: (email: string, username: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -50,7 +50,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [rawPosts, setRawPosts] = useState<Omit<Post, 'user'>[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,9 +79,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...c,
             timestamp: (c.timestamp as Timestamp).toDate()
           }))
-        } as Post;
+        } as Omit<Post, 'user'>;
       });
-      setPosts(postsList);
+      setRawPosts(postsList);
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -110,6 +110,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  const posts = useMemo(() => {
+    const userMap = new Map(users.map(user => [user.id, user]));
+    return rawPosts.map(post => {
+      const user = userMap.get(post.userId);
+      return {
+        ...post,
+        user: user ? { username: user.username, avatarUrl: user.avatarUrl } : { username: 'unknown', avatarUrl: '' }
+      };
+    });
+  }, [rawPosts, users]);
+
 
   const signUp = async (email: string, username: string, password: string) => {
     // Check if username already exists
@@ -150,21 +162,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await firebaseSignOut(auth);
     setCurrentUser(null);
-    setPosts([]);
+    setRawPosts([]);
     setUsers([]);
     router.push('/login');
   };
 
 
-  const addPost = async (post: Omit<NewPost, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => {
+  const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {
       const newPostData = {
-        ...post,
-        user: {
-          username: currentUser.username,
-          avatarUrl: currentUser.avatarUrl
-        },
+        userId: currentUser.id,
+        imageUrl: post.imageUrl,
+        caption: post.caption,
         timestamp: serverTimestamp(),
         likes: 0,
         comments: [],
@@ -174,12 +184,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
 
       // Optimistic update
-      const newPostForUI: Post = {
+      const newPostForUI: Omit<Post, 'user'> = {
         id: newPostRef.id,
-        user: {
-          username: currentUser.username,
-          avatarUrl: currentUser.avatarUrl
-        },
+        userId: currentUser.id,
         imageUrl: post.imageUrl,
         caption: post.caption,
         timestamp: new Date(),
@@ -187,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         comments: [],
         isLiked: false,
       };
-      setPosts(prevPosts => [newPostForUI, ...prevPosts]);
+      setRawPosts(prevPosts => [newPostForUI, ...prevPosts]);
 
     } catch (error) {
       console.error("Error adding post: ", error);
@@ -197,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePost = (postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
-    const postToUpdate = posts.find(p => p.id === postId);
+    const postToUpdate = rawPosts.find(p => p.id === postId);
     if (!postToUpdate) return;
   
     // Handle comments
@@ -215,7 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
-      setPosts(prevPosts =>
+      setRawPosts(prevPosts =>
         prevPosts.map(p =>
           p.id === postId ? { ...p, comments: [...p.comments, newCommentForUI] } : p
         )
@@ -225,13 +232,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
     // Handle likes and other updates from a callback
     } else if (typeof payload === 'function') {
-        const updates = payload(postToUpdate);
-        
-        // This part is now specifically for likes
-        const newIsLiked = updates.isLiked;
+        // Since we don't have the 'user' on the rawPost, we can't pass it.
+        // The function signature for `payload` in `updatePost` might need to be re-evaluated
+        // if more complex updates are needed. For now, this is for LIKES ONLY.
+        const newIsLiked = payload({ ...postToUpdate, user: { username: '', avatarUrl: '' } }).isLiked;
         if (newIsLiked === undefined) return;
 
-        setPosts(prevPosts =>
+        setRawPosts(prevPosts =>
             prevPosts.map(p => {
                 if (p.id === postId) {
                     const currentLikes = p.likes || 0;

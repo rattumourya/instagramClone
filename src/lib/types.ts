@@ -20,7 +20,8 @@ export interface Comment {
 
 export interface Post {
   id: string;
-  user: Pick<User, 'username' | 'avatarUrl'>;
+  userId: string;
+  user: Pick<User, 'username' | 'avatarUrl'>; // This will be added client-side
   imageUrl: string;
   caption: string;
   timestamp: Date;

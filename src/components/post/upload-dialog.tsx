@@ -135,7 +135,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         }
 
         addPost({
-            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
             imageUrl,
             caption: values.caption,
         });
@@ -244,5 +243,3 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     </Dialog>
   );
 }
-
-    
