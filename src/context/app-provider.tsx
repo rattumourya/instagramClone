@@ -68,37 +68,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const fetchPublicData = useCallback(async () => {
-    try {
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
-      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      setUsers(usersList);
-
-      const postsCollection = collection(db, 'posts');
-      const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-      const postsSnapshot = await getDocs(postsQuery);
-      const postsList = postsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-              id: doc.id,
-              ...data,
-              timestamp: (data.timestamp as Timestamp).toDate(),
-              comments: (data.comments || []).map((c: any) => ({
-                  ...c,
-                  timestamp: (c.timestamp as Timestamp).toDate()
-              }))
-          } as RawPost;
-      });
-      setRawPosts(postsList);
-    } catch (error) {
-      console.error("Error fetching public data:", error);
-    }
-  }, []);
-
   useEffect(() => {
+    const fetchPublicData = async () => {
+      try {
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setUsers(usersList);
+
+        const postsCollection = collection(db, 'posts');
+        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+        const postsSnapshot = await getDocs(postsQuery);
+        const postsList = postsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                timestamp: (data.timestamp as Timestamp).toDate(),
+                comments: (data.comments || []).map((c: any) => ({
+                    ...c,
+                    timestamp: (c.timestamp as Timestamp).toDate()
+                }))
+            } as RawPost;
+        });
+        setRawPosts(postsList);
+      } catch (error) {
+        console.error("Error fetching public data:", error);
+      }
+    };
+
     setLoading(true);
     fetchPublicData();
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -117,10 +118,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [fetchPublicData]);
+  }, []);
   
   const posts = useMemo(() => {
-    if (users.length === 0 || rawPosts.length === 0) return [];
+    if (users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -171,7 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    // onAuthStateChanged will handle setting the user
+    setUsers(prev => [...prev, newUser]);
     router.push('/');
   };
 
