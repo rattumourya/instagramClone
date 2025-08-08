@@ -66,7 +66,7 @@ export function PostCard({ post }: { post: PostType }) {
             alt="Post image"
             fill
             className="object-cover"
-            data-ai-hint="photo"
+            data-ai-hint="landscape photo"
             />
         </div>
 

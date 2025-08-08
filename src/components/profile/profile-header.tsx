@@ -13,7 +13,7 @@ export function ProfileHeader({ user }: { user: User }) {
           alt={user.username}
           fill
           className="rounded-full object-cover"
-          data-ai-hint="person"
+          data-ai-hint="avatar portrait"
         />
       </div>
       <div className="space-y-4">

@@ -23,7 +23,7 @@ export function PostGrid({ posts }: { posts: Post[] }) {
             alt="Post image"
             fill
             className="object-cover"
-            data-ai-hint="photo"
+            data-ai-hint="landscape photo"
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 text-white">
             <div className="flex items-center gap-2 font-bold">

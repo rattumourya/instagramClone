@@ -43,7 +43,7 @@ export function Header() {
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className='rounded-full'>
                     <Avatar className='h-8 w-8'>
-                        <AvatarImage src='https://placehold.co/150x150.png' alt='@mona_lisa' />
+                        <AvatarImage src='https://placehold.co/150x150.png' alt='@mona_lisa' data-ai-hint="avatar" />
                         <AvatarFallback>ML</AvatarFallback>
                     </Avatar>
                 </Button>
