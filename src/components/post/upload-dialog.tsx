@@ -30,7 +30,7 @@ import Image from 'next/image';
 
 const formSchema = z.object({
   caption: z.string().max(2200),
-  image: z.instanceof(File).refine(file => file.size > 0, 'Image is required.'),
+  image: z.instanceof(File).optional(),
 });
 
 export function UploadDialog({ children }: { children: ReactNode }) {
@@ -42,7 +42,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       caption: '',
-      image: new File([], ''),
     },
   });
 
@@ -54,6 +53,10 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!values.image) {
+        form.setError('image', { type: 'manual', message: 'Image is required.' });
+        return;
+    }
     const imageUrl = await toBase64(values.image);
     addPost({
       user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
@@ -69,6 +72,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     const file = event.target.files?.[0];
     if (file) {
       form.setValue('image', file);
+      form.clearErrors('image');
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
@@ -78,7 +82,13 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) {
+        form.reset();
+        setPreview(null);
+      }
+    }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -105,7 +115,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                           className="h-full w-full object-cover rounded-md"
                         />
                       ) : (
-                        <FormLabel className="cursor-pointer p-8 text-center text-sm text-muted-foreground">
+                        <FormLabel className="flex h-full w-full cursor-pointer items-center justify-center p-8 text-center text-sm text-muted-foreground">
                           Click to select image
                         </FormLabel>
                       )}
