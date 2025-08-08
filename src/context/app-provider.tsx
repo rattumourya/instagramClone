@@ -89,8 +89,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (userSnap.exists()) {
           const userData = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(userData);
-          // Only fetch all data if it hasn't been fetched yet
-          if (posts.length === 0 && users.length === 0) {
+          // Only fetch all data if it hasn't been fetched yet or if users list is empty
+          if (users.length === 0) {
             await fetchAllData();
           }
         } else {
@@ -99,8 +99,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setCurrentUser(null);
-        setPosts([]);
-        setUsers([]);
       }
       setLoading(false);
     });
@@ -147,6 +145,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setCurrentUser(null);
+    setPosts([]);
+    setUsers([]);
     router.push('/login');
   };
 
