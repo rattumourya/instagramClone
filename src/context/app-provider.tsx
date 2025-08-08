@@ -63,7 +63,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const usersSnapshot = await getDocs(usersCollection);
       const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
       setUsers(usersList);
-      const userMap = new Map(usersList.map(user => [user.id, user]));
 
       // Fetch all posts
       const postsCollection = collection(db, 'posts');
@@ -76,13 +75,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           id: doc.id,
           ...data,
           timestamp: (data.timestamp as Timestamp).toDate(),
-          comments: data.comments.map((c: any) => {
-            const commentUser = userMap.get(c.user.id) || c.user;
-            return {
+          comments: data.comments.map((c: any) => ({
             ...c,
-            user: { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl },
             timestamp: (c.timestamp as Timestamp).toDate()
-          }})
+          }))
         } as Omit<Post, 'user'>;
       });
       setRawPosts(postsList);
@@ -119,8 +115,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const userMap = new Map(users.map(user => [user.id, user]));
     return rawPosts.map(post => {
       const user = userMap.get(post.userId);
+      const comments = post.comments.map(comment => {
+          const commentUser = userMap.get(comment.user.id);
+          return {
+              ...comment,
+              user: commentUser ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } : { id: 'unknown', username: 'unknown', avatarUrl: '' }
+          }
+      });
       return {
         ...post,
+        comments,
         user: user ? { username: user.username, avatarUrl: user.avatarUrl } : { username: 'unknown', avatarUrl: '' }
       };
     });
@@ -222,9 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       const newCommentForFirestore = {
-        id: newCommentForUI.id,
-        text: newCommentForUI.text,
-        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        ...newCommentForUI,
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
@@ -238,9 +240,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
     // Handle likes and other updates from a callback
     } else if (typeof payload === 'function') {
-        // Since we don't have the 'user' on the rawPost, we can't pass it.
-        // The function signature for `payload` in `updatePost` might need to be re-evaluated
-        // if more complex updates are needed. For now, this is for LIKES ONLY.
         const newIsLiked = payload({ ...postToUpdate, user: { username: '', avatarUrl: '' } }).isLiked;
         if (newIsLiked === undefined) return;
 
