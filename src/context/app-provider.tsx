@@ -92,23 +92,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         if (userSnap.exists()) {
           const userData = { id: userSnap.id, ...userSnap.data() } as User;
+          await fetchAllData();
           setCurrentUser(userData);
-          // Only fetch all data if it hasn't been fetched yet or if users list is empty
-          if (users.length === 0) {
-            await fetchAllData();
-          }
         } else {
            console.log("User document not found in Firestore for uid:", firebaseUser.uid);
            setCurrentUser(null);
         }
       } else {
         setCurrentUser(null);
+        // Clear data on sign out
+        setUsers([]);
+        setRawPosts([]);
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const posts = useMemo(() => {
