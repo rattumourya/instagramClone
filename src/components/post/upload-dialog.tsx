@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type ReactNode } from 'react';
@@ -35,7 +36,7 @@ const formSchema = z.object({
 export function UploadDialog({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
-  const { addPost } = useApp();
+  const { addPost, currentUser } = useApp();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,10 +46,18 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    const imageUrl = await toBase64(values.image);
     addPost({
-      user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
-      imageUrl: URL.createObjectURL(values.image),
+      user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+      imageUrl,
       caption: values.caption,
     });
     form.reset();
