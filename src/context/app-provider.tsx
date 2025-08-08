@@ -29,7 +29,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePost = (updatedPost: Post) => {
-    setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setPosts(prevPosts => prevPosts.map(p => p.id === updatedPost.id ? updatedPost : p));
   }
 
   return (
