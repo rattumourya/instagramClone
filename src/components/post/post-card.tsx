@@ -17,6 +17,7 @@ import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 export function PostCard({ post }: { post: PostType }) {
   const { updatePost, currentUser } = useApp();
   const [newComment, setNewComment] = useState('');
+  const [showAllComments, setShowAllComments] = useState(false);
 
   const handleLike = () => {
     updatePost(post.id, (currentPost) => ({
@@ -43,6 +44,8 @@ export function PostCard({ post }: { post: PostType }) {
       setNewComment('');
     }
   };
+  
+  const commentsToShow = showAllComments ? post.comments : post.comments.slice(0, 2);
 
   return (
     <Card className="w-full max-w-xl">
@@ -73,7 +76,7 @@ export function PostCard({ post }: { post: PostType }) {
                     <Button variant="ghost" size="icon" onClick={handleLike}>
                         <Heart className={cn('h-6 w-6 transition-all duration-200 ease-in-out', post.isLiked ? 'fill-destructive text-destructive' : 'text-foreground')} />
                     </Button>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => document.getElementById(`comment-input-${post.id}`)?.focus()}>
                         <MessageCircle className="h-6 w-6" />
                     </Button>
                      <Button variant="ghost" size="icon">
@@ -91,11 +94,16 @@ export function PostCard({ post }: { post: PostType }) {
                 <Link href={`/${post.user.username}`} className="font-semibold text-sm mr-2">{post.user.username}</Link>
                 <span className='text-sm'>{post.caption}</span>
             </div>
+            
+            {post.comments.length > 2 && !showAllComments && (
+              <button onClick={() => setShowAllComments(true)} className="text-sm text-muted-foreground p-0 h-auto bg-transparent hover:bg-transparent">
+                  View all {post.comments.length} comments
+              </button>
+            )}
 
             {post.comments.length > 0 && (
                 <div className="space-y-2 text-sm">
-                    <p className="text-muted-foreground">View all {post.comments.length} comments</p>
-                    {post.comments.slice(0,2).map((comment) => (
+                    {commentsToShow.map((comment) => (
                         <div key={comment.id}>
                              <Link href={`/${comment.user.username}`} className="font-semibold mr-2">{comment.user.username}</Link>
                              <span>{comment.text}</span>
@@ -112,6 +120,7 @@ export function PostCard({ post }: { post: PostType }) {
         <div className="border-t px-4 py-2">
             <form onSubmit={handleAddComment} className='flex items-center gap-2'>
                 <Input
+                    id={`comment-input-${post.id}`}
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Add a comment..."
