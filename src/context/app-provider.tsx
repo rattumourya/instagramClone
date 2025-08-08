@@ -50,15 +50,9 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser: User = {
-  id: 'unknown',
+const unknownUser: Pick<User, 'username' | 'avatarUrl'> = {
   username: 'unknown',
-  name: 'Unknown User',
   avatarUrl: 'https://placehold.co/150x150.png',
-  bio: '',
-  postsCount: 0,
-  followersCount: 0,
-  followingCount: 0,
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -70,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchPublicData = async () => {
+      setLoading(true);
       try {
         const usersCollection = collection(db, 'users');
         const usersSnapshot = await getDocs(usersCollection);
@@ -96,10 +91,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error("Error fetching public data:", error);
       }
     };
-
-    setLoading(true);
-    fetchPublicData();
     
+    fetchPublicData();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -133,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const commentUser = userMap.get(comment.userId) ?? unknownUser;
         return {
           ...comment,
-          user: { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl }
+          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl }
         };
       });
   
