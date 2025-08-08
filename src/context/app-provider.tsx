@@ -128,22 +128,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
     // Handle comments
     if (typeof payload === 'object' && 'newComment' in payload) {
-      const newComment: Comment = {
+      const clientTimestamp = new Date();
+      const newCommentForUI: Comment = {
         id: `comment-${Date.now()}-${Math.random()}`,
         text: payload.newComment,
         user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-        timestamp: new Date(),
+        timestamp: clientTimestamp,
+      };
+
+      const newCommentForFirestore = {
+        id: newCommentForUI.id,
+        text: payload.newComment,
+        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
       // Optimistic update for comments
       setPosts(prevPosts =>
         prevPosts.map(p =>
-          p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p
+          p.id === postId ? { ...p, comments: [...p.comments, newCommentForUI] } : p
         )
       );
   
       // Firestore update for comments
-      updateDoc(postRef, { comments: arrayUnion({ ...newComment, timestamp: serverTimestamp() }) });
+      updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
     // Handle likes and other updates
     } else if (typeof payload === 'function') {
@@ -155,7 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         prevPosts.map(p => {
           if (p.id === postId) {
             const currentLikes = p.likes || 0;
-            const newLikes = newIsLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+            const newLikes = newIsLiked === true ? currentLikes + 1 : newIsLiked === false ? Math.max(0, currentLikes - 1) : currentLikes;
             return { ...p, ...updates, likes: newLikes };
           }
           return p;
