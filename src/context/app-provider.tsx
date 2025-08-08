@@ -50,10 +50,16 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser: Pick<User, 'username' | 'avatarUrl'> = {
+const unknownUser: Pick<User, 'username' | 'avatarUrl' | 'id' | 'name' | 'postsCount' | 'followersCount' | 'followingCount'> = {
+  id: 'unknown',
+  name: 'Unknown User',
   username: 'unknown',
   avatarUrl: 'https://placehold.co/150x150.png',
+  postsCount: 0,
+  followersCount: 0,
+  followingCount: 0,
 };
+
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [rawPosts, setRawPosts] = useState<RawPost[]>([]);
@@ -82,16 +88,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 timestamp: (data.timestamp as Timestamp).toDate(),
                 comments: (data.comments || []).map((c: any) => ({
                     ...c,
-                    timestamp: (c.timestamp as Timestamp).toDate()
+                    timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
                 }))
             } as RawPost;
         });
         setRawPosts(postsList);
       } catch (error) {
         console.error("Error fetching public data:", error);
-      } finally {
-        // Defer setting loading to false until auth state is confirmed
       }
+      // Defer setting loading to false until auth state is also resolved.
     };
     
     fetchPublicData();
@@ -105,19 +110,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(fetchedUser);
         } else {
+           // This case can happen if a user is deleted from Firestore but not from Auth
            setCurrentUser(null);
         }
       } else {
         setCurrentUser(null);
       }
-      setLoading(false); // Set loading to false after auth state is resolved and public data has been fetched
+      setLoading(false); 
     });
 
     return () => unsubscribe();
   }, []);
   
   const posts = useMemo(() => {
-    if (users.length === 0 || rawPosts.length === 0) return [];
+    // Prevent processing until all data is available
+    if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -125,7 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return rawPosts.map(post => {
       const postUser = userMap.get(post.userId) ?? unknownUser;
       
-      const hydratedComments = post.comments.map(comment => {
+      const hydratedComments = (post.comments || []).map(comment => {
         const commentUser = userMap.get(comment.userId) ?? unknownUser;
         return {
           ...comment,
@@ -140,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser]);
+  }, [rawPosts, users, currentUser, loading]);
 
 
   const signUp = async (email: string, username: string, password: string) => {
@@ -240,7 +247,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
       setRawPosts(prevPosts =>
         prevPosts.map(p =>
-          p.id === postId ? { ...p, comments: [...p.comments, newCommentForUI] } : p
+          p.id === postId ? { ...p, comments: [...(p.comments || []), newCommentForUI] } : p
         )
       );
   

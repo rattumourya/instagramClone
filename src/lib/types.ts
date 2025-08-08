@@ -9,7 +9,7 @@ export interface User {
   postsCount: number;
   followersCount: number;
   followingCount: number;
-  likedPosts: string[];
+  likedPosts?: string[]; // Make optional as it might not exist for all users initially
 }
 
 export interface Comment {
