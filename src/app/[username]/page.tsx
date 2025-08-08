@@ -9,6 +9,35 @@ import { useEffect, useState, use } from 'react';
 import { User } from '@/lib/types';
 import { Post } from '@/lib/types';
 
+const ProfilePageSkeleton = () => (
+  <main className="min-h-screen">
+    <Header />
+    <div className="container mx-auto max-w-5xl px-4">
+      <div className="flex items-center gap-8 md:gap-16 p-4 md:p-8">
+        <div className="w-24 h-24 md:w-36 md:h-36 rounded-full bg-muted animate-pulse" />
+        <div className="space-y-4">
+          <div className="h-8 w-48 bg-muted animate-pulse rounded-md" />
+          <div className="flex gap-8">
+            <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
+            <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
+            <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
+          </div>
+          <div className='space-y-2'>
+            <div className="h-4 w-32 bg-muted animate-pulse rounded-md" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded-md" />
+          </div>
+        </div>
+      </div>
+      <hr className="my-4" />
+      <div className="grid grid-cols-3 gap-1 md:gap-4">
+        <div className="aspect-square bg-muted animate-pulse rounded-md" />
+        <div className="aspect-square bg-muted animate-pulse rounded-md" />
+        <div className="aspect-square bg-muted animate-pulse rounded-md" />
+      </div>
+    </div>
+  </main>
+);
+
 // The params object can be a promise in async components, so we use `use` to unwrap it.
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
@@ -27,33 +56,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   }, [users, posts, username, loading]);
 
-  // Initial loading state while waiting for auth and data
-  if (loading || (users.length === 0 && !user)) {
-    return (
-      <main className="min-h-screen">
-        <Header />
-        <div className="container mx-auto max-w-5xl px-4">
-          <div className="flex items-center gap-8 md:gap-16 p-4 md:p-8">
-            <div className="w-24 h-24 md:w-36 md:h-36 rounded-full bg-muted animate-pulse" />
-            <div className="space-y-4">
-              <div className="h-8 w-48 bg-muted animate-pulse rounded-md" />
-              <div className="flex gap-8">
-                <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
-                <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
-                <div className="h-6 w-20 bg-muted animate-pulse rounded-md"/>
-              </div>
-              <div className='space-y-2'>
-                <div className="h-4 w-32 bg-muted animate-pulse rounded-md" />
-                <div className="h-4 w-64 bg-muted animate-pulse rounded-md" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
+  if (loading) {
+    return <ProfilePageSkeleton />;
   }
   
-  // After loading, if the user is still not found, show 404
   if (!user) {
     notFound();
   }

@@ -89,6 +89,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRawPosts(postsList);
       } catch (error) {
         console.error("Error fetching public data:", error);
+      } finally {
+        // Defer setting loading to false until auth state is confirmed
       }
     };
     
@@ -108,14 +110,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentUser(null);
       }
-      setLoading(false);
+      setLoading(false); // Set loading to false after auth state is resolved and public data has been fetched
     });
 
     return () => unsubscribe();
   }, []);
   
   const posts = useMemo(() => {
-    if (users.length === 0) return [];
+    if (users.length === 0 || rawPosts.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -172,7 +174,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged will handle setting the user
     router.push('/');
   };
 
@@ -233,9 +234,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       const newCommentForFirestore = {
-        id: newCommentForUI.id,
-        text: newCommentForUI.text,
-        userId: newCommentForUI.userId,
+        ...newCommentForUI,
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
@@ -258,13 +257,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Optimistically update user and posts state
         setCurrentUser(prevUser => {
             if (!prevUser) return null;
-            const newLikedPosts = new Set(prevUser.likedPosts || []);
+            const currentLikedPosts = new Set(prevUser.likedPosts || []);
             if (newIsLiked) {
-                newLikedPosts.add(postId);
+                currentLikedPosts.add(postId);
             } else {
-                newLikedPosts.delete(postId);
+                currentLikedPosts.delete(postId);
             }
-            return { ...prevUser, likedPosts: Array.from(newLikedPosts) };
+            return { ...prevUser, likedPosts: Array.from(currentLikedPosts) };
         });
 
         setRawPosts(prevPosts =>
