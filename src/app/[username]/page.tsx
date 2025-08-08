@@ -61,6 +61,11 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   }
   
   if (!user) {
+    // We need to wait for the data to be loaded.
+    // Return skeleton if users are not yet populated.
+    if(users.length === 0){
+        return <ProfilePageSkeleton/>;
+    }
     notFound();
   }
 
@@ -75,3 +80,5 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     </main>
   );
 }
+
+    

@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -50,7 +50,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser: Pick<User, 'username' | 'avatarUrl' | 'id' | 'name' | 'postsCount' | 'followersCount' | 'followingCount'> = {
+const unknownUser: User = {
   id: 'unknown',
   name: 'Unknown User',
   username: 'unknown',
@@ -58,8 +58,9 @@ const unknownUser: Pick<User, 'username' | 'avatarUrl' | 'id' | 'name' | 'postsC
   postsCount: 0,
   followersCount: 0,
   followingCount: 0,
+  bio: '',
+  likedPosts: []
 };
-
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [rawPosts, setRawPosts] = useState<RawPost[]>([]);
@@ -69,37 +70,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchPublicData = async () => {
+    const fetchAllData = async () => {
       setLoading(true);
       try {
         const usersCollection = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersCollection);
+        const postsCollection = collection(db, 'posts');
+        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+
+        const [usersSnapshot, postsSnapshot] = await Promise.all([
+          getDocs(usersCollection),
+          getDocs(postsQuery)
+        ]);
+
         const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(usersList);
 
-        const postsCollection = collection(db, 'posts');
-        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-        const postsSnapshot = await getDocs(postsQuery);
         const postsList = postsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                timestamp: (data.timestamp as Timestamp).toDate(),
-                comments: (data.comments || []).map((c: any) => ({
-                    ...c,
-                    timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
-                }))
-            } as RawPost;
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            timestamp: (data.timestamp as Timestamp).toDate(),
+            comments: (data.comments || []).map((c: any) => ({
+              ...c,
+              timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
+            }))
+          } as RawPost;
         });
         setRawPosts(postsList);
+
       } catch (error) {
         console.error("Error fetching public data:", error);
+      } finally {
+        // The loading state will be finally turned off by the auth listener
       }
-      // Defer setting loading to false until auth state is also resolved.
     };
     
-    fetchPublicData();
+    fetchAllData();
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -110,7 +117,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(fetchedUser);
         } else {
-           // This case can happen if a user is deleted from Firestore but not from Auth
            setCurrentUser(null);
         }
       } else {
@@ -123,8 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
-    // Prevent processing until all data is available
-    if (loading || users.length === 0) return [];
+    if (loading) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -136,14 +141,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const commentUser = userMap.get(comment.userId) ?? unknownUser;
         return {
           ...comment,
-          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl }
+          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id }
         };
       });
   
       return {
         ...post,
         comments: hydratedComments,
-        user: { username: postUser.username, avatarUrl: postUser.avatarUrl },
+        user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id },
         isLiked: likedPostsSet.has(post.id)
       };
     });
@@ -308,3 +313,5 @@ export function useApp() {
   }
   return context;
 }
+
+    
