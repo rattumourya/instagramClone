@@ -49,10 +49,15 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser = {
+const unknownUser: User = {
   id: 'unknown',
   username: 'unknown',
+  name: 'Unknown User',
   avatarUrl: 'https://placehold.co/150x150.png',
+  bio: '',
+  postsCount: 0,
+  followersCount: 0,
+  followingCount: 0,
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -62,30 +67,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const fetchAllData = useCallback(async () => {
-    const usersCollection = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersCollection);
-    const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-    setUsers(usersList);
-
-    const postsCollection = collection(db, 'posts');
-    const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-    const postsSnapshot = await getDocs(postsQuery);
-    const postsList = postsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        timestamp: (data.timestamp as Timestamp).toDate(),
-        comments: data.comments.map((c: any) => ({
-          ...c,
-          timestamp: (c.timestamp as Timestamp).toDate()
-        }))
-      } as RawPost;
-    });
-    setRawPosts(postsList);
-  }, []);
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
@@ -94,8 +75,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          setCurrentUser({ id: userSnap.id, ...userSnap.data() } as User);
-          await fetchAllData();
+          const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
+          setCurrentUser(fetchedUser);
+
+          // Fetch all data needed for the app
+          const usersCollection = collection(db, 'users');
+          const usersSnapshot = await getDocs(usersCollection);
+          const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+          setUsers(usersList);
+
+          const postsCollection = collection(db, 'posts');
+          const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+          const postsSnapshot = await getDocs(postsQuery);
+          const postsList = postsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              timestamp: (data.timestamp as Timestamp).toDate(),
+              comments: data.comments.map((c: any) => ({
+                ...c,
+                timestamp: (c.timestamp as Timestamp).toDate()
+              }))
+            } as RawPost;
+          });
+          setRawPosts(postsList);
+
         } else {
            setCurrentUser(null);
            setUsers([]);
@@ -110,7 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [fetchAllData]);
+  }, []);
   
   const posts = useMemo(() => {
     if (loading || users.length === 0) return [];
@@ -161,21 +166,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    setUsers(prevUsers => [...prevUsers, newUser]);
-    setCurrentUser(newUser);
+    // No need to set users/currentUser locally, onAuthStateChanged will handle it
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    // No need to set users/currentUser locally, onAuthStateChanged will handle it
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    setCurrentUser(null);
-    setRawPosts([]);
-    setUsers([]);
+    // State will be cleared by onAuthStateChanged
     router.push('/login');
   };
 
@@ -194,6 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
 
+      // Optimistically update UI
       const newPostForUI: RawPost = {
         id: newPostRef.id,
         userId: currentUser.id,
@@ -214,8 +218,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePost = (postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
-    const postToUpdate = rawPosts.find(p => p.id === postId);
-    if (!postToUpdate) return;
   
     if (typeof payload === 'object' && 'newComment' in payload) {
       const clientTimestamp = new Date();
@@ -277,3 +279,5 @@ export function useApp() {
   }
   return context;
 }
+
+    
