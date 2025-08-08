@@ -30,8 +30,8 @@ import {
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-type RawComment = Omit<Comment, 'user'>;
-type RawPost = Omit<Post, 'user' | 'comments'> & { comments: RawComment[] };
+type RawComment = Omit<Comment, 'user'> & { userId: string };
+type RawPost = Omit<Post, 'user' | 'comments'> & { comments: RawComment[], userId: string };
 type NewPost = { imageUrl: string, caption: string };
 type UpdatePayload = ((post: Post) => Partial<Post>) | { newComment: string };
 
@@ -68,8 +68,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    setLoading(true);
+
+    // Fetch all public data (users and posts)
+    const fetchPublicData = async () => {
+        try {
+            const usersCollection = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersCollection);
+            const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setUsers(usersList);
+
+            const postsCollection = collection(db, 'posts');
+            const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+            const postsSnapshot = await getDocs(postsQuery);
+            const postsList = postsSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    timestamp: (data.timestamp as Timestamp).toDate(),
+                    comments: (data.comments || []).map((c: any) => ({
+                        ...c,
+                        timestamp: (c.timestamp as Timestamp).toDate()
+                    }))
+                } as RawPost;
+            });
+            setRawPosts(postsList);
+        } catch (error) {
+            console.error("Error fetching public data:", error);
+        }
+    };
+    
+    fetchPublicData();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setLoading(true);
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userRef);
@@ -77,39 +109,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (userSnap.exists()) {
           const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(fetchedUser);
-
-          // Fetch all data needed for the app
-          const usersCollection = collection(db, 'users');
-          const usersSnapshot = await getDocs(usersCollection);
-          const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-          setUsers(usersList);
-
-          const postsCollection = collection(db, 'posts');
-          const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-          const postsSnapshot = await getDocs(postsQuery);
-          const postsList = postsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              timestamp: (data.timestamp as Timestamp).toDate(),
-              comments: data.comments.map((c: any) => ({
-                ...c,
-                timestamp: (c.timestamp as Timestamp).toDate()
-              }))
-            } as RawPost;
-          });
-          setRawPosts(postsList);
-
         } else {
            setCurrentUser(null);
-           setUsers([]);
-           setRawPosts([]);
         }
       } else {
         setCurrentUser(null);
-        setUsers([]);
-        setRawPosts([]);
       }
       setLoading(false);
     });
@@ -118,7 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    if (users.length === 0 || rawPosts.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
   
@@ -139,7 +143,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl }
       };
     });
-  }, [rawPosts, users, loading]);
+  }, [rawPosts, users]);
 
 
   const signUp = async (email: string, username: string, password: string) => {
@@ -166,13 +170,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    // No need to set users/currentUser locally, onAuthStateChanged will handle it
+    // onAuthStateChanged will handle setting the user
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    // No need to set users/currentUser locally, onAuthStateChanged will handle it
+    // onAuthStateChanged will handle setting the user
     router.push('/');
   };
 
@@ -279,5 +283,3 @@ export function useApp() {
   }
   return context;
 }
-
-    
