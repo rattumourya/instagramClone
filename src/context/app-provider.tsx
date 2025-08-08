@@ -50,31 +50,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser: User = {
+const unknownUser: Pick<User, 'id' | 'name' | 'username' | 'avatarUrl'> = {
   id: 'unknown',
   name: 'Unknown User',
   username: 'unknown',
   avatarUrl: 'https://placehold.co/150x150.png',
-  postsCount: 0,
-  followersCount: 0,
-  followingCount: 0,
-  bio: '',
-  likedPosts: []
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [rawPosts, setRawPosts] = useState<RawPost[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const initializeApp = async () => {
+    const fetchPublicData = async () => {
       setLoading(true);
-
-      // 1. Fetch all public data (users and posts) first, regardless of auth state.
-      // This is crucial for displaying public pages correctly for logged-out users.
       try {
         const usersCollection = collection(db, 'users');
         const postsCollection = collection(db, 'posts');
@@ -104,43 +97,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       } catch (error) {
         console.error("Error fetching public data:", error);
-      } finally {
-        // Set up the auth listener after fetching public data.
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-          if (firebaseUser) {
-            // This now uses the already-fetched user list if possible
-            const existingUser = users.find(u => u.id === firebaseUser.uid);
-            if (existingUser) {
-              setCurrentUser(existingUser);
-            } else {
-              // Fallback to fetch if user wasn't in the initial list for some reason
-              const userRef = doc(db, 'users', firebaseUser.uid);
-              const userSnap = await getDoc(userRef);
-              if (userSnap.exists()) {
+      }
+      setLoading(false);
+    };
+    
+    fetchPublicData();
+  }, []);
+  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        setFirebaseUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (loading) return; // Don't run this until public data is loaded
+
+    if (firebaseUser) {
+      const userFromList = users.find(u => u.id === firebaseUser.uid);
+      if (userFromList) {
+        setCurrentUser(userFromList);
+      } else {
+        // This is a fallback if the user wasn't in the initial fetch
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        getDoc(userRef).then(userSnap => {
+            if (userSnap.exists()) {
                 const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
                 setCurrentUser(fetchedUser);
-                // Also update the main users list to ensure consistency
-                setUsers(prev => [...prev.filter(u => u.id !== fetchedUser.id), fetchedUser]);
-              } else {
-                 console.error("Authenticated user not found in Firestore, signing out.");
-                 setCurrentUser(null);
-                 await firebaseSignOut(auth);
-              }
+                setUsers(prev => {
+                  // Avoid duplicates
+                  if(prev.some(u => u.id === fetchedUser.id)) return prev;
+                  return [...prev, fetchedUser];
+                });
+            } else {
+                console.error("Authenticated user not found in Firestore, signing out.");
+                firebaseSignOut(auth);
             }
-          } else {
-            setCurrentUser(null);
-          }
-          // Set loading to false only after all data is fetched and auth state is determined.
-          setLoading(false);
         });
-
-        return () => unsubscribe();
       }
-    };
+    } else {
+      setCurrentUser(null);
+    }
+  }, [firebaseUser, users, loading]);
 
-    initializeApp();
-  }, [users]); // Rerun if the user list gets updated from a fallback fetch.
-  
   const posts = useMemo(() => {
     if (loading || users.length === 0) return [];
     
@@ -176,10 +176,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const firebaseUser = userCredential.user;
+    const fbUser = userCredential.user;
 
     const newUser: User = {
-      id: firebaseUser.uid,
+      id: fbUser.uid,
       username,
       name: username,
       email,
@@ -191,21 +191,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       likedPosts: []
     };
     
-    await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    // setCurrentUser(newUser) is handled by onAuthStateChanged
+    await setDoc(doc(db, 'users', fbUser.uid), newUser);
+    // State updates are handled by auth listeners
     setUsers(prev => [...prev, newUser]);
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    // setCurrentUser is handled by onAuthStateChanged
+    // State updates are handled by auth listeners
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    setCurrentUser(null);
+    // State updates are handled by auth listeners
     router.push('/login');
   };
 

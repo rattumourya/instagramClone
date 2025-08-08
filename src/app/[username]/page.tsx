@@ -51,7 +51,7 @@ export default function ProfilePage({ params }: { params: { username: string } }
     return posts.filter(p => p.userId === user.id);
   }, [posts, user]);
 
-  if (loading) {
+  if (loading && !user) {
     return <ProfilePageSkeleton />;
   }
 

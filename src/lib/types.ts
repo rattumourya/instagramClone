@@ -3,13 +3,13 @@ export interface User {
   id: string; // This will be the Firebase Auth UID
   username: string;
   name: string;
-  email?: string; // Add email field
+  email?: string;
   avatarUrl: string;
   bio?: string;
   postsCount: number;
   followersCount: number;
   followingCount: number;
-  likedPosts?: string[]; // Array of liked post IDs
+  likedPosts: string[]; // Array of liked post IDs
 }
 
 export interface Comment {
