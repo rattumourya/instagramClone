@@ -1,6 +1,6 @@
 
 "use client";
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { PostGrid } from '@/components/post/post-grid';
 import { ProfileHeader } from '@/components/profile/profile-header';
@@ -37,8 +37,9 @@ const ProfilePageSkeleton = () => (
   </main>
 );
 
-export default function ProfilePage({ params }: { params: { username: string } }) {
-  const { username } = params;
+export default function ProfilePage() {
+  const params = useParams();
+  const username = params.username as string;
   const { users, posts, loading } = useApp();
 
   const user: User | undefined = useMemo(() => {
