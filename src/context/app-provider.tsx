@@ -112,23 +112,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
+    if (loading) return [];
     const userMap = new Map(users.map(user => [user.id, user]));
+  
     return rawPosts.map(post => {
-      const user = userMap.get(post.userId);
-      const comments = post.comments.map(comment => {
-          const commentUser = userMap.get(comment.user.id);
-          return {
-              ...comment,
-              user: commentUser ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } : { id: 'unknown', username: 'unknown', avatarUrl: '' }
-          }
+      const postUser = userMap.get(post.userId);
+  
+      const hydratedComments = post.comments.map(comment => {
+        const commentUser = userMap.get(comment.user.id);
+        return {
+          ...comment,
+          user: commentUser 
+            ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } 
+            : { id: 'unknown', username: 'unknown', avatarUrl: '' }
+        };
       });
+  
       return {
         ...post,
-        comments,
-        user: user ? { username: user.username, avatarUrl: user.avatarUrl } : { username: 'unknown', avatarUrl: '' }
+        comments: hydratedComments,
+        user: postUser 
+          ? { username: postUser.username, avatarUrl: postUser.avatarUrl } 
+          : { username: 'unknown', avatarUrl: '' }
       };
     });
-  }, [rawPosts, users]);
+  }, [rawPosts, users, loading]);
 
 
   const signUp = async (email: string, username: string, password: string) => {
@@ -227,6 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const newCommentForFirestore = {
         ...newCommentForUI,
+        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
