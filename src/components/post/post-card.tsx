@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -22,9 +23,10 @@ export function PostCard({ post }: { post: PostType }) {
 
   const handleLike = () => {
     const newLikedState = !isLiked;
+    const newLikesCount = newLikedState ? likes + 1 : likes - 1;
     setIsLiked(newLikedState);
-    setLikes(newLikedState ? likes + 1 : likes - 1);
-    updatePost({ ...post, isLiked: newLikedState, likes: newLikedState ? likes + 1 : likes - 1 });
+    setLikes(newLikesCount);
+    updatePost({ ...post, isLiked: newLikedState, likes: newLikesCount, comments: comments });
   };
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -38,7 +40,7 @@ export function PostCard({ post }: { post: PostType }) {
       };
       const updatedComments = [...comments, commentToAdd];
       setComments(updatedComments);
-      updatePost({ ...post, comments: updatedComments });
+      updatePost({ ...post, comments: updatedComments, isLiked, likes });
       setNewComment('');
     }
   };
