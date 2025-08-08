@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -69,8 +69,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Fetch all public data (users and posts) on initial load
   useEffect(() => {
-    const fetchAllData = async () => {
+    const fetchPublicData = async () => {
       setLoading(true);
       try {
         const usersCollection = collection(db, 'users');
@@ -98,16 +99,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as RawPost;
         });
         setRawPosts(postsList);
-
       } catch (error) {
         console.error("Error fetching public data:", error);
       } finally {
-        // The loading state will be finally turned off by the auth listener
+        // Auth listener will handle turning off loading state
       }
     };
     
-    fetchAllData();
+    fetchPublicData();
+  }, []);
 
+  // Listen for auth changes
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -117,11 +120,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
           setCurrentUser(fetchedUser);
         } else {
+           // This case can happen if a user is deleted from Firestore but not from Auth
            setCurrentUser(null);
+           await firebaseSignOut(auth);
         }
       } else {
         setCurrentUser(null);
       }
+      // Only set loading to false once we know the auth state and have attempted to fetch public data
       setLoading(false); 
     });
 
@@ -129,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
-    if (loading) return [];
+    if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -153,7 +159,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
     });
   }, [rawPosts, users, currentUser, loading]);
-
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');
@@ -180,29 +185,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+    // Add new user to local state to avoid re-fetch
     setUsers(prev => [...prev, newUser]);
+    // The onAuthStateChanged listener will set the current user
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    // The onAuthStateChanged listener will set the current user
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    setCurrentUser(null);
+    // The onAuthStateChanged listener will clear the current user
     router.push('/login');
   };
 
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {
+      // Create a server timestamp
+      const timestamp = serverTimestamp();
       const newPostData = {
         userId: currentUser.id,
         imageUrl: post.imageUrl,
         caption: post.caption,
-        timestamp: serverTimestamp(),
+        timestamp: timestamp, // Use server timestamp for firestore
         likes: 0,
         comments: [],
       };
@@ -215,27 +225,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         userId: currentUser.id,
         imageUrl: post.imageUrl,
         caption: post.caption,
-        timestamp: new Date(),
+        timestamp: new Date(), // Use client date for immediate UI update
         likes: 0,
         comments: [],
       };
       setRawPosts(prevPosts => [newPostForUI, ...prevPosts]);
       
-      // Update user's post count
+      // Update user's post count in Firestore
       const userRef = doc(db, 'users', currentUser.id);
       await updateDoc(userRef, { postsCount: increment(1) });
+      
+      // Update user's post count in local state
       setCurrentUser(prevUser => prevUser ? { ...prevUser, postsCount: prevUser.postsCount + 1 } : null);
+      setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? {...u, postsCount: u.postsCount + 1} : u));
+
 
     } catch (error) {
       console.error("Error adding post: ", error);
     }
   };
 
-  const updatePost = (postId: string, payload: UpdatePayload) => {
+  const updatePost = useCallback((postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
     const userRef = doc(db, 'users', currentUser.id);
   
+    // Handle adding a comment
     if (typeof payload === 'object' && 'newComment' in payload) {
       const clientTimestamp = new Date();
       const newCommentForUI: RawComment = {
@@ -250,14 +265,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
+      // Optimistic UI update
       setRawPosts(prevPosts =>
         prevPosts.map(p =>
           p.id === postId ? { ...p, comments: [...(p.comments || []), newCommentForUI] } : p
         )
       );
   
+      // Update Firestore
       updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
+    // Handle liking/unliking a post
     } else if (typeof payload === 'function') {
         const fullPostForCallback = posts.find(p => p.id === postId);
         if (!fullPostForCallback) return;
@@ -297,7 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             likedPosts: newIsLiked ? arrayUnion(postId) : arrayRemove(postId)
         });
     }
-  };
+  }, [currentUser, posts]);
 
   return (
     <AppContext.Provider value={{ posts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
@@ -313,5 +331,3 @@ export function useApp() {
   }
   return context;
 }
-
-    

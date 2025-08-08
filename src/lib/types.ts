@@ -9,7 +9,7 @@ export interface User {
   postsCount: number;
   followersCount: number;
   followingCount: number;
-  likedPosts?: string[]; // Make optional as it might not exist for all users initially
+  likedPosts?: string[]; // Array of liked post IDs
 }
 
 export interface Comment {
@@ -31,5 +31,3 @@ export interface Post {
   comments: Comment[];
   isLiked: boolean; // This will be determined client-side per user
 }
-
-    
