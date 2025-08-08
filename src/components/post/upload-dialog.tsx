@@ -60,16 +60,10 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<F
             const canvas = document.createElement('canvas');
             let { width, height } = img;
 
-            if (width > height) {
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-            } else {
-                if (height > maxHeight) {
-                    width = Math.round((width * maxHeight) / height);
-                    height = maxHeight;
-                }
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
             }
 
             canvas.width = width;
