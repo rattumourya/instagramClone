@@ -30,7 +30,7 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
-  caption: z.string().max(2200),
+  caption: z.string().min(1, { message: 'Caption is required.' }).max(2200),
   image: z.instanceof(File).refine(file => file.size > 0, { message: 'Image is required.' }),
 });
 
@@ -46,6 +46,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
       caption: '',
       image: undefined,
     },
+    mode: 'onChange',
   });
 
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -80,7 +81,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     setOpen(false);
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File) => void) => {
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File | undefined) => void) => {
     const file = event.target.files?.[0];
     if (file) {
       fieldOnChange(file);
@@ -89,6 +90,9 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+        fieldOnChange(undefined);
+        setPreview(null);
     }
   };
 
