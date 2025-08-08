@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -56,34 +56,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const fetchAllData = useCallback(async () => {
+    // Fetch all users
+    const usersCollection = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersCollection);
+    const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    setUsers(usersList);
+
+    // Fetch all posts
+    const postsCollection = collection(db, 'posts');
+    const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+    const postsSnapshot = await getDocs(postsQuery);
+    const postsList = postsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      // Convert Firestore Timestamps to JS Date objects
+      return {
+        id: doc.id,
+        ...data,
+        timestamp: (data.timestamp as Timestamp).toDate(),
+        comments: data.comments.map((c: any) => ({
+          ...c,
+          timestamp: (c.timestamp as Timestamp).toDate()
+        }))
+      } as Omit<Post, 'user'>;
+    });
+    setRawPosts(postsList);
+  }, []);
+
   useEffect(() => {
-    const fetchAllData = async () => {
-      // Fetch all users
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
-      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      setUsers(usersList);
-
-      // Fetch all posts
-      const postsCollection = collection(db, 'posts');
-      const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-      const postsSnapshot = await getDocs(postsQuery);
-      const postsList = postsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        // Convert Firestore Timestamps to JS Date objects
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: (data.timestamp as Timestamp).toDate(),
-          comments: data.comments.map((c: any) => ({
-            ...c,
-            timestamp: (c.timestamp as Timestamp).toDate()
-          }))
-        } as Omit<Post, 'user'>;
-      });
-      setRawPosts(postsList);
-    };
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
       if (firebaseUser) {
@@ -92,15 +92,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         if (userSnap.exists()) {
           const userData = { id: userSnap.id, ...userSnap.data() } as User;
-          await fetchAllData();
           setCurrentUser(userData);
+          await fetchAllData();
         } else {
-           console.log("User document not found in Firestore for uid:", firebaseUser.uid);
+           console.error("User document not found in Firestore for uid:", firebaseUser.uid);
            setCurrentUser(null);
+           setUsers([]);
+           setRawPosts([]);
         }
       } else {
         setCurrentUser(null);
-        // Clear data on sign out
         setUsers([]);
         setRawPosts([]);
       }
@@ -108,22 +109,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchAllData]);
   
   const posts = useMemo(() => {
-    if (loading) return [];
+    if (loading || users.length === 0) return [];
+    
     const userMap = new Map(users.map(user => [user.id, user]));
   
-    return rawPosts.map(post => {
+    const hydratedPosts = rawPosts.map(post => {
       const postUser = userMap.get(post.userId);
-  
+      
       const hydratedComments = post.comments.map(comment => {
         const commentUser = userMap.get(comment.user.id);
         return {
           ...comment,
           user: commentUser 
             ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } 
-            : { id: 'unknown', username: 'unknown', avatarUrl: '' }
+            : { id: 'unknown', username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' }
         };
       });
   
@@ -132,9 +134,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         comments: hydratedComments,
         user: postUser 
           ? { username: postUser.username, avatarUrl: postUser.avatarUrl } 
-          : { username: 'unknown', avatarUrl: '' }
+          : { username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' }
       };
     });
+
+    return hydratedPosts;
   }, [rawPosts, users, loading]);
 
 
