@@ -9,6 +9,7 @@ export interface User {
   postsCount: number;
   followersCount: number;
   followingCount: number;
+  likedPosts?: string[];
 }
 
 export interface Comment {
@@ -28,5 +29,5 @@ export interface Post {
   timestamp: Date;
   likes: number;
   comments: Comment[];
-  isLiked: boolean;
+  isLiked: boolean; // This will be determined client-side per user
 }

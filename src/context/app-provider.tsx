@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Post, User, Comment } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -15,6 +15,7 @@ import {
   query,
   orderBy,
   arrayUnion,
+  arrayRemove,
   increment,
   Timestamp,
   setDoc,
@@ -31,9 +32,9 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments'> & { comments: RawComment[], userId: string };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { comments: RawComment[], userId: string };
 type NewPost = { imageUrl: string, caption: string };
-type UpdatePayload = ((post: Post) => Partial<Post>) | { newComment: string };
+type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
 interface AppContextType {
   posts: Post[];
@@ -67,37 +68,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const fetchPublicData = useCallback(async () => {
+    try {
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      setUsers(usersList);
+
+      const postsCollection = collection(db, 'posts');
+      const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+      const postsSnapshot = await getDocs(postsQuery);
+      const postsList = postsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+              id: doc.id,
+              ...data,
+              timestamp: (data.timestamp as Timestamp).toDate(),
+              comments: (data.comments || []).map((c: any) => ({
+                  ...c,
+                  timestamp: (c.timestamp as Timestamp).toDate()
+              }))
+          } as RawPost;
+      });
+      setRawPosts(postsList);
+    } catch (error) {
+      console.error("Error fetching public data:", error);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchPublicData = async () => {
-      try {
-        const usersCollection = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersCollection);
-        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(usersList);
-
-        const postsCollection = collection(db, 'posts');
-        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-        const postsSnapshot = await getDocs(postsQuery);
-        const postsList = postsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                timestamp: (data.timestamp as Timestamp).toDate(),
-                comments: (data.comments || []).map((c: any) => ({
-                    ...c,
-                    timestamp: (c.timestamp as Timestamp).toDate()
-                }))
-            } as RawPost;
-        });
-        setRawPosts(postsList);
-      } catch (error) {
-        console.error("Error fetching public data:", error);
-      }
-    };
-
+    setLoading(true);
     fetchPublicData();
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
@@ -116,12 +117,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchPublicData]);
   
   const posts = useMemo(() => {
     if (users.length === 0 || rawPosts.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
+    const likedPostsSet = new Set(currentUser?.likedPosts || []);
   
     return rawPosts.map(post => {
       const postUser = userMap.get(post.userId) ?? unknownUser;
@@ -137,10 +139,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return {
         ...post,
         comments: hydratedComments,
-        user: { username: postUser.username, avatarUrl: postUser.avatarUrl }
+        user: { username: postUser.username, avatarUrl: postUser.avatarUrl },
+        isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users]);
+  }, [rawPosts, users, currentUser]);
 
 
   const signUp = async (email: string, username: string, password: string) => {
@@ -164,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       postsCount: 0,
       followersCount: 0,
       followingCount: 0,
+      likedPosts: []
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
@@ -193,7 +197,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: serverTimestamp(),
         likes: 0,
         comments: [],
-        isLiked: false,
       };
 
       const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
@@ -207,9 +210,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(),
         likes: 0,
         comments: [],
-        isLiked: false,
       };
       setRawPosts(prevPosts => [newPostForUI, ...prevPosts]);
+      
+      // Update user's post count
+      const userRef = doc(db, 'users', currentUser.id);
+      await updateDoc(userRef, { postsCount: increment(1) });
+      setCurrentUser(prevUser => prevUser ? { ...prevUser, postsCount: prevUser.postsCount + 1 } : null);
 
     } catch (error) {
       console.error("Error adding post: ", error);
@@ -219,6 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePost = (postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
+    const userRef = doc(db, 'users', currentUser.id);
   
     if (typeof payload === 'object' && 'newComment' in payload) {
       const clientTimestamp = new Date();
@@ -248,22 +256,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const fullPostForCallback = posts.find(p => p.id === postId);
         if (!fullPostForCallback) return;
 
-        const newIsLiked = payload(fullPostForCallback).isLiked;
+        const { isLiked: newIsLiked } = payload(fullPostForCallback);
+
         if (newIsLiked === undefined) return;
+
+        // Optimistically update user and posts state
+        setCurrentUser(prevUser => {
+            if (!prevUser) return null;
+            const newLikedPosts = new Set(prevUser.likedPosts || []);
+            if (newIsLiked) {
+                newLikedPosts.add(postId);
+            } else {
+                newLikedPosts.delete(postId);
+            }
+            return { ...prevUser, likedPosts: Array.from(newLikedPosts) };
+        });
 
         setRawPosts(prevPosts =>
             prevPosts.map(p => {
                 if (p.id === postId) {
                     const currentLikes = p.likes || 0;
                     const newLikes = newIsLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
-                    return { ...p, isLiked: newIsLiked, likes: newLikes };
+                    return { ...p, likes: newLikes };
                 }
                 return p;
             })
         );
   
+        // Update Firestore
         updateDoc(postRef, {
             likes: increment(newIsLiked ? 1 : -1)
+        });
+        updateDoc(userRef, {
+            likedPosts: newIsLiked ? arrayUnion(postId) : arrayRemove(postId)
         });
     }
   };
