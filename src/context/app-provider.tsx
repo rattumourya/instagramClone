@@ -32,7 +32,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'timestamp'> & { userId: string, timestamp: Date | Timestamp, media: Media[] };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'timestamp'> & { userId: string, timestamp: Timestamp, media: Media[] };
 type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
@@ -159,7 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return {
         ...post,
         media: post.media || [],
-        timestamp: (post.timestamp as Timestamp)?.toDate() || new Date(),
+        timestamp: post.timestamp?.toDate() || new Date(),
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
@@ -209,12 +209,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {
-      const timestamp = serverTimestamp();
+      const serverTimestampValue = serverTimestamp();
       const newPostData = {
         userId: currentUser.id,
         media: post.media,
         caption: post.caption,
-        timestamp: timestamp,
+        timestamp: serverTimestampValue,
         likes: 0,
         comments: [],
       };
@@ -226,7 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         userId: currentUser.id,
         media: post.media,
         caption: post.caption,
-        timestamp: new Date(),
+        timestamp: Timestamp.now(),
         likes: 0,
         comments: [],
       };
