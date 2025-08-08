@@ -5,7 +5,7 @@ import { Header } from '@/components/layout/header';
 import { PostGrid } from '@/components/post/post-grid';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { useApp } from '@/context/app-provider';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { User } from '@/lib/types';
 import { Post } from '@/lib/types';
 
@@ -38,36 +38,28 @@ const ProfilePageSkeleton = () => (
   </main>
 );
 
-// The params object can be a promise in async components, so we use `use` to unwrap it.
-export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = use(params);
+export default function ProfilePage({ params }: { params: { username: string } }) {
+  const { username } = params;
   const { users, posts, loading } = useApp();
-  const [user, setUser] = useState<User | undefined>(undefined);
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+
+  const userPosts = useMemo(() => {
+    if (!user) return [];
+    return posts.filter(p => p.userId === user.id);
+  }, [posts, user]);
 
   useEffect(() => {
-    // We only process the user and posts when loading is false.
-    if (!loading && users.length > 0) {
+    if (!loading) {
       const foundUser = users.find(u => u.username === username);
-      if (foundUser) {
-        setUser(foundUser);
-        // Filter posts based on the found user's ID.
-        // The `posts` from `useApp` are already fully hydrated with user info and `isLiked`.
-        const foundPosts = posts.filter(p => p.userId === foundUser.id);
-        setUserPosts(foundPosts);
-      } else {
-        // If the user is not found after loading is complete, set user to undefined.
-        setUser(undefined);
-      }
+      setUser(foundUser || null);
     }
-  }, [users, posts, username, loading]);
+  }, [username, users, loading]);
 
   if (loading) {
     return <ProfilePageSkeleton />;
   }
-  
+
   if (!user) {
-    // If loading is finished and still no user, then they don't exist.
     notFound();
   }
 
