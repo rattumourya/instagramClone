@@ -112,12 +112,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [fetchAllData]);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    if (loading || users.length === 0 || rawPosts.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
+    const unknownUser = { username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' };
+    const unknownCommentUser = { id: 'unknown', username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' };
   
     const hydratedPosts = rawPosts.map(post => {
-      const postUser = userMap.get(post.userId);
+      const postUser = userMap.get(post.userId) ?? unknownUser;
       
       const hydratedComments = post.comments.map(comment => {
         const commentUser = userMap.get(comment.user.id);
@@ -125,16 +127,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...comment,
           user: commentUser 
             ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } 
-            : { id: 'unknown', username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' }
+            : unknownCommentUser
         };
       });
   
       return {
         ...post,
         comments: hydratedComments,
-        user: postUser 
-          ? { username: postUser.username, avatarUrl: postUser.avatarUrl } 
-          : { username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' }
+        user: { username: postUser.username, avatarUrl: postUser.avatarUrl }
       };
     });
 
