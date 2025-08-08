@@ -23,17 +23,26 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+  } from "@/components/ui/carousel"
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useApp } from '@/context/app-provider';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
+import type { Media } from '@/lib/types';
+import { UploadCloud } from 'lucide-react';
 
-const MAX_IMAGE_SIZE_BYTES = 1024 * 1024; // 1MB
+const MAX_IMAGE_SIZE_BYTES = 1024 * 1024 * 5; // 5MB
 
 const formSchema = z.object({
   caption: z.string().min(1, { message: 'Caption is required.' }).max(2200),
-  image: z.instanceof(File).refine(file => file.size > 0, { message: 'Image is required.' }),
+  files: z.array(z.instanceof(File)).min(1, 'Please select at least one file.'),
 });
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -93,7 +102,7 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<F
 
 export function UploadDialog({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<string[]>([]);
   const { addPost, currentUser } = useApp();
   const { toast } = useToast();
 
@@ -101,7 +110,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       caption: '',
-      image: new File([], ""),
+      files: [],
     },
     mode: 'onChange',
   });
@@ -116,63 +125,67 @@ export function UploadDialog({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!values.image) {
-        form.setError('image', { type: 'manual', message: 'Image is required.' });
-        return;
-    }
-
     try {
-        const resizedImage = await resizeImage(values.image, 1080, 1080); // Instagram's standard resolution
-        const imageUrl = await toBase64(resizedImage);
-        
-        if (imageUrl.length > MAX_IMAGE_SIZE_BYTES) {
-            toast({
-                variant: 'destructive',
-                title: 'Image Too Large',
-                description: 'The selected image is still too large after resizing. Please select a smaller file.',
-            });
-            return;
-        }
+        const media: Media[] = await Promise.all(values.files.map(async (file) => {
+            if (file.type.startsWith('image/')) {
+                const resizedImage = await resizeImage(file, 1080, 1080);
+                const url = await toBase64(resizedImage);
+                if (url.length > MAX_IMAGE_SIZE_BYTES) {
+                  throw new Error(`Image ${file.name} is too large after resizing.`);
+                }
+                return { url, type: 'image' as const };
+            } else if (file.type.startsWith('video/')) {
+                const url = await toBase64(file);
+                 if (url.length > MAX_IMAGE_SIZE_BYTES) { // Add a reasonable size limit for videos too
+                    throw new Error(`Video ${file.name} is too large.`);
+                }
+                return { url, type: 'video' as const };
+            }
+            throw new Error(`Unsupported file type: ${file.name}`);
+        }));
 
         addPost({
-            imageUrl,
+            media,
             caption: values.caption,
         });
         form.reset();
-        setPreview(null);
+        setPreviews([]);
         setOpen(false);
 
-    } catch (error) {
-        console.error("Error processing image:", error);
+    } catch (error: any) {
+        console.error("Error processing files:", error);
         toast({
             variant: 'destructive',
-            title: 'Error processing image',
-            description: 'There was an error while trying to process your image. Please try again.',
+            title: 'Error processing files',
+            description: error.message || 'There was an error while trying to process your files. Please try again.',
         });
     }
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File | undefined) => void) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      fieldOnChange(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File[]) => void) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      fieldOnChange(fileArray);
+      
+      const newPreviews = Array.from(files).map(file => URL.createObjectURL(file));
+      setPreviews(newPreviews);
     } else {
-        fieldOnChange(undefined);
-        setPreview(null);
+        fieldOnChange([]);
+        setPreviews([]);
     }
   };
+
+  const resetDialog = () => {
+    form.reset();
+    setPreviews([]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
       setOpen(isOpen);
       if (!isOpen) {
-        form.reset();
-        setPreview(null);
+        resetDialog();
       }
     }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -180,39 +193,65 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Create new post</DialogTitle>
           <DialogDescription>
-            Select a photo to share.
+            Select photos and videos to share.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="image"
+              name="files"
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
                     <div className="flex w-full items-center justify-center">
-                        <FormLabel htmlFor="image-upload" className="flex h-64 w-full cursor-pointer items-center justify-center rounded-md border-2 border-dashed">
-                          {preview ? (
-                            <Image
-                              src={preview}
-                              alt="Image preview"
-                              width={400}
-                              height={400}
-                              className="h-full w-full object-cover rounded-md"
-                            />
+                        <FormLabel htmlFor="file-upload" className="flex h-64 w-full cursor-pointer items-center justify-center rounded-md border-2 border-dashed">
+                          {previews.length > 0 ? (
+                            <Carousel className="w-full h-full max-w-xs">
+                                <CarouselContent>
+                                    {previews.map((src, index) => (
+                                        <CarouselItem key={index} className="flex items-center justify-center">
+                                            {field.value[index]?.type.startsWith('image/') ? (
+                                                <Image
+                                                    src={src}
+                                                    alt={`Preview ${index}`}
+                                                    width={400}
+                                                    height={400}
+                                                    className="h-full w-full object-contain rounded-md"
+                                                    onLoad={() => URL.revokeObjectURL(src)}
+                                                />
+                                            ) : (
+                                                <video
+                                                    src={src}
+                                                    controls
+                                                    className="h-full w-full object-contain rounded-md"
+                                                    onCanPlay={() => URL.revokeObjectURL(src)}
+                                                />
+                                            )}
+                                        </CarouselItem>
+                                    ))}
+                                </CarouselContent>
+                                {previews.length > 1 && (
+                                    <>
+                                        <CarouselPrevious className='absolute left-2 top-1/2 -translate-y-1/2' />
+                                        <CarouselNext className='absolute right-2 top-1/2 -translate-y-1/2' />
+                                    </>
+                                )}
+                            </Carousel>
                           ) : (
-                            <div className="text-center text-sm text-muted-foreground">
-                              Click to select image
+                            <div className="text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                              <UploadCloud className='w-10 h-10' />
+                              Click to select photos and videos
                             </div>
                           )}
                         </FormLabel>
                         <Input
-                          id="image-upload"
+                          id="file-upload"
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/*"
+                          multiple
                           className="hidden"
-                          onChange={(e) => handleImageChange(e, field.onChange)}
+                          onChange={(e) => handleFileChange(e, field.onChange)}
                         />
                     </div>
                   </FormControl>

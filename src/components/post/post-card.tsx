@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,12 +12,38 @@ import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
 import type { Post as PostType } from '@/lib/types';
-import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel"
 
 export function PostCard({ post }: { post: PostType }) {
   const { updatePost } = useApp();
   const [newComment, setNewComment] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
+  const [currentSlide, setCurrentSlide] = useState(0)
+
+  useEffect(() => {
+    if (!carouselApi) return
+
+    setCurrentSlide(carouselApi.selectedScrollSnap())
+
+    const onSelect = () => {
+      setCurrentSlide(carouselApi.selectedScrollSnap())
+    }
+
+    carouselApi.on("select", onSelect)
+    
+    return () => {
+      carouselApi.off("select", onSelect)
+    }
+  }, [carouselApi])
 
   const handleLike = () => {
     updatePost(post.id, (currentPost) => ({
@@ -50,13 +76,42 @@ export function PostCard({ post }: { post: PostType }) {
         </div>
         
         <div className="relative aspect-square w-full">
-            <Image
-            src={post.imageUrl}
-            alt="Post image"
-            fill
-            className="object-cover"
-            data-ai-hint="landscape photo"
-            />
+            <Carousel setApi={setCarouselApi} className="w-full h-full">
+              <CarouselContent>
+                {post.media.map((mediaItem, index) => (
+                  <CarouselItem key={index}>
+                    {mediaItem.type === 'image' ? (
+                      <Image
+                        src={mediaItem.url}
+                        alt={`Post media ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        data-ai-hint="landscape photo"
+                      />
+                    ) : (
+                      <video
+                        src={mediaItem.url}
+                        controls
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {post.media.length > 1 && (
+                <>
+                    <CarouselPrevious className='absolute left-2 top-1/2 -translate-y-1/2' />
+                    <CarouselNext className='absolute right-2 top-1/2 -translate-y-1/2' />
+                </>
+              )}
+            </Carousel>
+            {post.media.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {post.media.map((_, i) => (
+                        <div key={i} className={cn("h-1.5 w-1.5 rounded-full", i === currentSlide ? 'bg-white' : 'bg-white/50')}></div>
+                    ))}
+                </div>
+            )}
         </div>
 
         <div className="p-4 space-y-2">

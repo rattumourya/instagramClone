@@ -20,11 +20,16 @@ export interface Comment {
   timestamp: Date;
 }
 
+export interface Media {
+  url: string;
+  type: 'image' | 'video';
+}
+
 export interface Post {
   id: string;
   userId: string;
   user: Pick<User, 'username' | 'avatarUrl' | 'id'>; // This will be added client-side
-  imageUrl: string;
+  media: Media[];
   caption: string;
   timestamp: Date;
   likes: number;

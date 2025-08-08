@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import { Heart, MessageCircle } from 'lucide-react';
+import { Heart, MessageCircle, Files } from 'lucide-react';
 import type { Post } from '@/lib/types';
 
 export function PostGrid({ posts }: { posts: Post[] }) {
@@ -20,12 +20,15 @@ export function PostGrid({ posts }: { posts: Post[] }) {
       {posts.map(post => (
         <div key={post.id} className="group relative aspect-square">
           <Image
-            src={post.imageUrl}
+            src={post.media[0].url}
             alt="Post image"
             fill
             className="object-cover"
             data-ai-hint="landscape photo"
           />
+          {post.media.length > 1 && (
+            <Files className="absolute top-2 right-2 h-5 w-5 text-white drop-shadow-lg" />
+          )}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 text-white">
             <div className="flex items-center gap-2 font-bold">
               <Heart className="h-6 w-6" />

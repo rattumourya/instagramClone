@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import type { Post, User, Comment } from '@/lib/types';
+import type { Post, User, Comment, Media } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import {
   collection,
@@ -32,8 +32,8 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { comments: RawComment[], userId: string };
-type NewPost = { imageUrl: string, caption: string };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'media'> & { media: Media[], comments: RawComment[], userId: string };
+type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
 interface AppContextType {
@@ -83,10 +83,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const postsList = postsSnapshot.docs.map(doc => {
           const data = doc.data();
-          console.log("data  ",data);
+          const media = data.media || [{ url: data.imageUrl, type: 'image' }]; // Backwards compatibility
           return {
             id: doc.id,
             ...data,
+            media,
             timestamp: (data.timestamp as Timestamp).toDate(),
             comments: (data.comments || []).map((c: any) => ({
               ...c,
@@ -142,12 +143,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [firebaseUser, users, loading]);
 
-  const posts = useMemo(() => {
+  const posts: Post[] = useMemo(() => {
     if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
-    console.log("rawPosts ",rawPosts)
+
     return rawPosts.map(post => {
       const postUser = userMap.get(post.userId) ?? unknownUser;
       
@@ -216,7 +217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const timestamp = serverTimestamp();
       const newPostData = {
         userId: currentUser.id,
-        imageUrl: post.imageUrl,
+        media: post.media,
         caption: post.caption,
         timestamp: timestamp,
         likes: 0,
@@ -228,7 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newPostForUI: RawPost = {
         id: newPostRef.id,
         userId: currentUser.id,
-        imageUrl: post.imageUrl,
+        media: post.media,
         caption: post.caption,
         timestamp: new Date(),
         likes: 0,
@@ -312,7 +313,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             likedPosts: newIsLiked ? arrayUnion(postId) : arrayRemove(postId)
         });
     }
-  }, [currentUser, posts]);
+  }, [currentUser, posts, router]);
 
   return (
     <AppContext.Provider value={{ posts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
