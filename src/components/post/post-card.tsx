@@ -16,17 +16,16 @@ import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 
 export function PostCard({ post }: { post: PostType }) {
   const { updatePost } = useApp();
-  const [isLiked, setIsLiked] = useState(post.isLiked);
-  const [likes, setLikes] = useState(post.likes);
-  const [comments, setComments] = useState<Comment[]>(post.comments);
   const [newComment, setNewComment] = useState('');
 
   const handleLike = () => {
-    const newLikedState = !isLiked;
-    const newLikesCount = newLikedState ? likes + 1 : likes - 1;
-    setIsLiked(newLikedState);
-    setLikes(newLikesCount);
-    updatePost({ ...post, isLiked: newLikedState, likes: newLikesCount, comments });
+    const newLikedState = !post.isLiked;
+    const newLikesCount = newLikedState ? post.likes + 1 : post.likes - 1;
+    updatePost({ 
+      ...post, 
+      isLiked: newLikedState, 
+      likes: newLikesCount 
+    });
   };
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -38,10 +37,8 @@ export function PostCard({ post }: { post: PostType }) {
         user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
         timestamp: new Date(),
       };
-      const updatedComments = [...comments, commentToAdd];
-      setComments(updatedComments);
-      // Pass the current `likes` state directly to ensure it's up-to-date.
-      updatePost({ ...post, comments: updatedComments, isLiked, likes });
+      const updatedComments = [...post.comments, commentToAdd];
+      updatePost({ ...post, comments: updatedComments });
       setNewComment('');
     }
   };
@@ -73,7 +70,7 @@ export function PostCard({ post }: { post: PostType }) {
             <div className="flex justify-between">
                 <div className="flex gap-2">
                     <Button variant="ghost" size="icon" onClick={handleLike}>
-                        <Heart className={cn('h-6 w-6 transition-all duration-200 ease-in-out', isLiked ? 'fill-destructive text-destructive' : 'text-foreground')} />
+                        <Heart className={cn('h-6 w-6 transition-all duration-200 ease-in-out', post.isLiked ? 'fill-destructive text-destructive' : 'text-foreground')} />
                     </Button>
                     <Button variant="ghost" size="icon">
                         <MessageCircle className="h-6 w-6" />
@@ -87,17 +84,17 @@ export function PostCard({ post }: { post: PostType }) {
                 </Button>
             </div>
 
-            <div className="text-sm font-semibold">{likes.toLocaleString()} likes</div>
+            <div className="text-sm font-semibold">{post.likes.toLocaleString()} likes</div>
             
             <div>
                 <Link href={`/${post.user.username}`} className="font-semibold text-sm mr-2">{post.user.username}</Link>
                 <span className='text-sm'>{post.caption}</span>
             </div>
 
-            {comments.length > 0 && (
+            {post.comments.length > 0 && (
                 <div className="space-y-2 text-sm">
-                    <p className="text-muted-foreground">View all {comments.length} comments</p>
-                    {comments.slice(0,2).map((comment) => (
+                    <p className="text-muted-foreground">View all {post.comments.length} comments</p>
+                    {post.comments.slice(0,2).map((comment) => (
                         <div key={comment.id}>
                              <Link href={`/${comment.user.username}`} className="font-semibold mr-2">{comment.user.username}</Link>
                              <span>{comment.text}</span>
