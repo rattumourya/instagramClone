@@ -66,7 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchPublicData = async () => {
+    const fetchDataAndAuth = async () => {
       setLoading(true);
       try {
         const usersCollection = collection(db, 'users');
@@ -83,7 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const postsList = postsSnapshot.docs.map(doc => {
           const data = doc.data();
-          const media = data.media || [{ url: data.imageUrl, type: 'image' }]; // Backwards compatibility
+          const media = data.media || [{ url: data.imageUrl, type: 'image' }];
           return {
             id: doc.id,
             ...data,
@@ -99,36 +99,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       } catch (error) {
         console.error("Error fetching public data:", error);
+      } finally {
+        // Auth listener is set up after initial data load
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setFirebaseUser(user);
+            // We can now safely say we are done with the initial loading phase
+            setLoading(false);
+        });
+        return unsubscribe;
       }
-      setLoading(false);
     };
     
-    fetchPublicData();
+    fetchDataAndAuth();
   }, []);
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setFirebaseUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (loading) return; // Don't run this until public data is loaded
+    if (loading) return;
 
     if (firebaseUser) {
       const userFromList = users.find(u => u.id === firebaseUser.uid);
       if (userFromList) {
         setCurrentUser(userFromList);
       } else {
-        // This is a fallback if the user wasn't in the initial fetch
+        console.warn("Authenticated user not found in initially fetched user list. This can happen on sign-up before a full refresh.");
         const userRef = doc(db, 'users', firebaseUser.uid);
         getDoc(userRef).then(userSnap => {
             if (userSnap.exists()) {
                 const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
                 setCurrentUser(fetchedUser);
                 setUsers(prev => {
-                  // Avoid duplicates
                   if(prev.some(u => u.id === fetchedUser.id)) return prev;
                   return [...prev, fetchedUser];
                 });
@@ -150,20 +149,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
 
     return rawPosts.map(post => {
-      const postUser = userMap.get(post.userId) ?? unknownUser;
+      const postUser = userMap.get(post.userId) ?? { ...unknownUser, id: post.userId };
       
       const hydratedComments = (post.comments || []).map(comment => {
-        const commentUser = userMap.get(comment.userId) ?? unknownUser;
+        const commentUser = userMap.get(comment.userId) ?? { ...unknownUser, id: comment.userId };
         return {
           ...comment,
-          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id }
+          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id, name: commentUser.name }
         };
       });
   
       return {
         ...post,
         comments: hydratedComments,
-        user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id },
+        user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
       };
     });
@@ -194,20 +193,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', fbUser.uid), newUser);
-    // State updates are handled by auth listeners
+    // This is the critical fix: update local state immediately
     setUsers(prev => [...prev, newUser]);
+    // setCurrentUser will be handled by the onAuthStateChanged listener
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    // State updates are handled by auth listeners
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    // State updates are handled by auth listeners
     router.push('/login');
   };
 
