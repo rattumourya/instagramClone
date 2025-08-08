@@ -7,19 +7,23 @@ import { ProfileHeader } from '@/components/profile/profile-header';
 import { useApp } from '@/context/app-provider';
 import { useEffect, useState, use } from 'react';
 import { User } from '@/lib/types';
+import { Post } from '@/lib/types';
 
 // The params object can be a promise in async components, so we use `use` to unwrap it.
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { users, posts } = useApp();
   const [user, setUser] = useState<User | undefined>(undefined);
-  
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+
   useEffect(() => {
     const foundUser = users.find(u => u.username === username);
     setUser(foundUser);
-  }, [users, username]);
-
-  const userPosts = posts.filter(p => p.user.username === username);
+    if (foundUser) {
+      const foundPosts = posts.filter(p => p.user.username === username);
+      setUserPosts(foundPosts);
+    }
+  }, [users, posts, username]);
 
   if (!user) {
     // Show a loading state or a skeleton component while user data is being fetched

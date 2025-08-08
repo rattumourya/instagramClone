@@ -13,6 +13,7 @@ import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
 import type { Post as PostType, Comment as CommentType } from '@/lib/types';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 
 export function PostCard({ post }: { post: PostType }) {
   const { updatePost, currentUser } = useApp();
@@ -46,6 +47,12 @@ export function PostCard({ post }: { post: PostType }) {
   };
   
   const commentsToShow = showAllComments ? post.comments : post.comments.slice(0, 2);
+
+  const getFormattedTimestamp = () => {
+    if (!post.timestamp) return 'just now';
+    const date = post.timestamp instanceof Timestamp ? post.timestamp.toDate() : post.timestamp;
+    return formatDistanceToNow(date, { addSuffix: true });
+  }
 
   return (
     <Card className="w-full max-w-xl">
@@ -105,7 +112,7 @@ export function PostCard({ post }: { post: PostType }) {
                 <div className="space-y-2 text-sm">
                     {commentsToShow.map((comment) => (
                         <div key={comment.id}>
-                             <Link href={`/${comment.user.username}`} className="font-semibold mr-2">{comment.user.username}</Link>
+                             <Link href={`/${comment.user.username}`} className="font-semibold mr-2 hover:underline">{comment.user.username}</Link>
                              <span>{comment.text}</span>
                         </div>
                     ))}
@@ -113,7 +120,7 @@ export function PostCard({ post }: { post: PostType }) {
             )}
             
             <div className="text-xs text-muted-foreground uppercase">
-                {post.timestamp ? formatDistanceToNow(new Date(post.timestamp), { addSuffix: true }) : 'just now'}
+                {getFormattedTimestamp()}
             </div>
         </div>
 

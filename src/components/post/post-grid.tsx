@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from 'next/image';
@@ -28,7 +29,7 @@ export function PostGrid({ posts }: { posts: Post[] }) {
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 text-white">
             <div className="flex items-center gap-2 font-bold">
               <Heart className="h-6 w-6" />
-              <span>{post.likes}</span>
+              <span>{post.likes.toLocaleString()}</span>
             </div>
             <div className="flex items-center gap-2 font-bold">
               <MessageCircle className="h-6 w-6" />

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from 'next/image';
@@ -24,7 +25,7 @@ export function ProfileHeader({ user }: { user: User }) {
         <div className="flex gap-8">
           <div><span className="font-semibold">{user.postsCount}</span> posts</div>
           <div><span className="font-semibold">{user.followersCount.toLocaleString()}</span> followers</div>
-          <div><span className="font-semibold">{user.followingCount}</span> following</div>
+          <div><span className="font-semibold">{user.followingCount.toLocaleString()}</span> following</div>
         </div>
         <div>
           <h1 className="font-semibold">{user.name}</h1>
