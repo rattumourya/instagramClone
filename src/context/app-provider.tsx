@@ -32,7 +32,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'media'> & { media: Media[], comments: RawComment[], userId: string };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { userId: string };
 type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
@@ -83,11 +83,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const postsList = postsSnapshot.docs.map(doc => {
           const data = doc.data();
-          const media = data.media || [{ url: data.imageUrl, type: 'image' }];
           return {
             id: doc.id,
             ...data,
-            media,
             timestamp: (data.timestamp as Timestamp).toDate(),
             comments: (data.comments || []).map((c: any) => ({
               ...c,
@@ -327,5 +325,7 @@ export function useApp() {
   }
   return context;
 }
+
+    
 
     
