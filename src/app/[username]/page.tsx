@@ -46,12 +46,18 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
   useEffect(() => {
+    // We only process the user and posts when loading is false.
     if (!loading && users.length > 0) {
       const foundUser = users.find(u => u.username === username);
-      setUser(foundUser);
       if (foundUser) {
+        setUser(foundUser);
+        // Filter posts based on the found user's ID.
+        // The `posts` from `useApp` are already fully hydrated.
         const foundPosts = posts.filter(p => p.userId === foundUser.id);
         setUserPosts(foundPosts);
+      } else {
+        // If the user is not found after loading is complete, set user to undefined.
+        setUser(undefined);
       }
     }
   }, [users, posts, username, loading]);
@@ -61,11 +67,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   }
   
   if (!user) {
-    // We need to wait for the data to be loaded.
-    // Return skeleton if users are not yet populated.
-    if(users.length === 0){
-        return <ProfilePageSkeleton/>;
-    }
+    // If loading is finished and still no user, then they don't exist.
     notFound();
   }
 
@@ -80,5 +82,3 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     </main>
   );
 }
-
-    

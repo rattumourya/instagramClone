@@ -70,8 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchPublicData = async () => {
       try {
         const usersCollection = collection(db, 'users');
         const postsCollection = collection(db, 'posts');
@@ -100,34 +99,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRawPosts(postsList);
       } catch (error) {
         console.error("Error fetching public data:", error);
-      } finally {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-          if (firebaseUser) {
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            const userSnap = await getDoc(userRef);
-            
-            if (userSnap.exists()) {
-              const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
-              setCurrentUser(fetchedUser);
-            } else {
-               console.error("Authenticated user not found in Firestore, signing out.");
-               setCurrentUser(null);
-               await firebaseSignOut(auth);
-            }
-          } else {
-            setCurrentUser(null);
-          }
-          setLoading(false); 
-        });
-        return () => unsubscribe();
       }
     };
     
-    fetchData();
+    const initialize = async () => {
+      setLoading(true);
+      await fetchPublicData(); // Fetch public data first
+
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
+            setCurrentUser(fetchedUser);
+          } else {
+             console.error("Authenticated user not found in Firestore, signing out.");
+             setCurrentUser(null);
+             await firebaseSignOut(auth);
+          }
+        } else {
+          setCurrentUser(null);
+        }
+        setLoading(false); // Set loading to false after auth state is determined
+      });
+
+      return () => unsubscribe();
+    }
+
+    initialize();
   }, []);
   
   const posts = useMemo(() => {
-    if (users.length === 0) return [];
+    if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -150,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser]);
+  }, [rawPosts, users, currentUser, loading]);
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');
