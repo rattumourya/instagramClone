@@ -127,26 +127,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Handle comments
     if (typeof payload === 'object' && 'newComment' in payload) {
         const newCommentText = payload.newComment;
+        const newCommentTimestamp = new Date();
         
-        // Optimistic update for comments
-        const commentForUI: Comment = {
-            id: `comment-${Date.now()}`,
-            text: newCommentText,
-            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-            timestamp: new Date(),
-        };
-        setPosts(prevPosts =>
-            prevPosts.map(p => p.id === postId ? { ...p, comments: [...p.comments, commentForUI] } : p)
-        );
-
-        // Firestore update for comments
-        const commentForFirestore = {
+        const newComment: Comment = {
             id: `comment-${Date.now()}-${Math.random()}`,
             text: newCommentText,
             user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-            timestamp: serverTimestamp() // This is the correct usage for updateDoc
+            timestamp: newCommentTimestamp,
         };
-        updateDoc(postRef, { comments: arrayUnion(commentForFirestore) });
+
+        // Optimistic update for comments
+        setPosts(prevPosts =>
+            prevPosts.map(p => p.id === postId ? { ...p, comments: [...p.comments, newComment] } : p)
+        );
+
+        // Firestore update for comments
+        updateDoc(postRef, { comments: arrayUnion(newComment) });
 
     // Handle likes and other updates
     } else if (typeof payload === 'function') {
@@ -160,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
 
         // Update Firestore
-        const firestoreUpdates: Partial<Post> = {};
+        const firestoreUpdates: Partial<Post> & {[key: string]: any} = {};
         if (updates.isLiked !== undefined) {
             firestoreUpdates.likes = increment(updates.isLiked ? 1 : -1);
             firestoreUpdates.isLiked = updates.isLiked;
