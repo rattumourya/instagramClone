@@ -75,44 +75,46 @@ export function PostCard({ post }: { post: PostType }) {
           </Link>
         </div>
         
-        <div className="relative aspect-square w-full">
-            <Carousel setApi={setCarouselApi} className="w-full h-full">
-              <CarouselContent>
-                {post.media.map((mediaItem, index) => (
-                  <CarouselItem key={index}>
-                    {mediaItem.type === 'image' ? (
-                      <Image
-                        src={mediaItem.url}
-                        alt={`Post media ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        data-ai-hint="landscape photo"
-                      />
-                    ) : (
-                      <video
-                        src={mediaItem.url}
-                        controls
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              {post.media.length > 1 && (
-                <>
-                    <CarouselPrevious className='absolute left-2 top-1/2 -translate-y-1/2' />
-                    <CarouselNext className='absolute right-2 top-1/2 -translate-y-1/2' />
-                </>
-              )}
-            </Carousel>
-            {post.media.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {post.media.map((_, i) => (
-                        <div key={i} className={cn("h-1.5 w-1.5 rounded-full", i === currentSlide ? 'bg-white' : 'bg-white/50')}></div>
+        {post.media && post.media.length > 0 && (
+            <div className="relative aspect-square w-full">
+                <Carousel setApi={setCarouselApi} className="w-full h-full">
+                  <CarouselContent>
+                    {post.media.map((mediaItem, index) => (
+                      <CarouselItem key={index}>
+                        {mediaItem.type === 'image' ? (
+                          <Image
+                            src={mediaItem.url}
+                            alt={`Post media ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            data-ai-hint="landscape photo"
+                          />
+                        ) : (
+                          <video
+                            src={mediaItem.url}
+                            controls
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </CarouselItem>
                     ))}
-                </div>
-            )}
-        </div>
+                  </CarouselContent>
+                  {post.media.length > 1 && (
+                    <>
+                        <CarouselPrevious className='absolute left-2 top-1/2 -translate-y-1/2' />
+                        <CarouselNext className='absolute right-2 top-1/2 -translate-y-1/2' />
+                    </>
+                  )}
+                </Carousel>
+                {post.media.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {post.media.map((_, i) => (
+                            <div key={i} className={cn("h-1.5 w-1.5 rounded-full", i === currentSlide ? 'bg-white' : 'bg-white/50')}></div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
 
         <div className="p-4 space-y-2">
             <div className="flex justify-between">
