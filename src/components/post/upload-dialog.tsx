@@ -30,7 +30,7 @@ import Image from 'next/image';
 
 const formSchema = z.object({
   caption: z.string().max(2200),
-  image: z.instanceof(File).optional(),
+  image: z.instanceof(File).refine(file => file.size > 0, { message: 'Image is required.' }),
 });
 
 export function UploadDialog({ children }: { children: ReactNode }) {
@@ -71,7 +71,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      form.setValue('image', file);
+      form.setValue('image', file, { shouldValidate: true });
       form.clearErrors('image');
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -94,7 +94,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Create new post</DialogTitle>
           <DialogDescription>
-            Drag a photo here or click to select one.
+            Select a photo to share.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -102,29 +102,32 @@ export function UploadDialog({ children }: { children: ReactNode }) {
             <FormField
               control={form.control}
               name="image"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
                   <FormControl>
-                    <div className="flex h-64 w-full items-center justify-center rounded-md border-2 border-dashed">
-                      {preview ? (
-                        <Image
-                          src={preview}
-                          alt="Image preview"
-                          width={400}
-                          height={400}
-                          className="h-full w-full object-cover rounded-md"
-                        />
-                      ) : (
-                        <FormLabel className="flex h-full w-full cursor-pointer items-center justify-center p-8 text-center text-sm text-muted-foreground">
-                          Click to select image
+                    <div className="flex w-full items-center justify-center">
+                        <FormLabel htmlFor="image-upload" className="flex h-64 w-full cursor-pointer items-center justify-center rounded-md border-2 border-dashed">
+                          {preview ? (
+                            <Image
+                              src={preview}
+                              alt="Image preview"
+                              width={400}
+                              height={400}
+                              className="h-full w-full object-cover rounded-md"
+                            />
+                          ) : (
+                            <div className="text-center text-sm text-muted-foreground">
+                              Click to select image
+                            </div>
+                          )}
                         </FormLabel>
-                      )}
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageChange}
-                      />
+                        <Input
+                          id="image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageChange}
+                        />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -144,7 +147,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
               )}
             />
             <DialogFooter>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isValid}>
                 Share
               </Button>
             </DialogFooter>
