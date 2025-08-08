@@ -19,12 +19,10 @@ export function PostCard({ post }: { post: PostType }) {
   const [newComment, setNewComment] = useState('');
 
   const handleLike = () => {
-    const newLikedState = !post.isLiked;
-    const newLikesCount = newLikedState ? post.likes + 1 : post.likes - 1;
     updatePost({ 
       ...post, 
-      isLiked: newLikedState, 
-      likes: newLikesCount 
+      isLiked: !post.isLiked,
+      likes: post.isLiked ? post.likes - 1 : post.likes + 1,
     });
   };
 
@@ -37,8 +35,7 @@ export function PostCard({ post }: { post: PostType }) {
         user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
         timestamp: new Date(),
       };
-      const updatedComments = [...post.comments, commentToAdd];
-      updatePost({ ...post, comments: updatedComments });
+      updatePost({ ...post, comments: [...post.comments, commentToAdd] });
       setNewComment('');
     }
   };
