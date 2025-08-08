@@ -44,6 +44,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       caption: '',
+      image: undefined,
     },
   });
 
@@ -79,11 +80,10 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     setOpen(false);
   }
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File) => void) => {
     const file = event.target.files?.[0];
     if (file) {
-      form.setValue('image', file, { shouldValidate: true });
-      form.clearErrors('image');
+      fieldOnChange(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
@@ -113,7 +113,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
             <FormField
               control={form.control}
               name="image"
-              render={() => (
+              render={({ field }) => (
                 <FormItem>
                   <FormControl>
                     <div className="flex w-full items-center justify-center">
@@ -137,7 +137,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={handleImageChange}
+                          onChange={(e) => handleImageChange(e, field.onChange)}
                         />
                     </div>
                   </FormControl>
