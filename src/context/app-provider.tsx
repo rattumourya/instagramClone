@@ -83,6 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const postsList = postsSnapshot.docs.map(doc => {
           const data = doc.data();
+          console.log("data  ",data);
           return {
             id: doc.id,
             ...data,
@@ -146,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
-  
+    console.log("rawPosts ",rawPosts)
     return rawPosts.map(post => {
       const postUser = userMap.get(post.userId) ?? unknownUser;
       
