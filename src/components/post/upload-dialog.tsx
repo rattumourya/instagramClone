@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useApp } from '@/context/app-provider';
 import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   caption: z.string().max(2200),
@@ -37,6 +38,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const { addPost, currentUser } = useApp();
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,6 +55,15 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!currentUser) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'You must be logged in to create a post.',
+      });
+      return;
+    }
+
     if (!values.image) {
         form.setError('image', { type: 'manual', message: 'Image is required.' });
         return;
@@ -147,7 +158,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
               )}
             />
             <DialogFooter>
-              <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isValid}>
+              <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isValid || !currentUser}>
                 Share
               </Button>
             </DialogFooter>
