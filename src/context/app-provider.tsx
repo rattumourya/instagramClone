@@ -32,7 +32,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { userId: string };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'timestamp'> & { userId: string, timestamp: Date | Timestamp, media: Media[] };
 type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
@@ -86,8 +86,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return {
             id: doc.id,
             ...data,
-            timestamp: (data.timestamp as Timestamp).toDate(),
-            media: data.media || [], // Ensure media is an array
+            media: data.media || [],
+            timestamp: (data.timestamp as Timestamp),
             comments: (data.comments || []).map((c: any) => ({
               ...c,
               timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
@@ -99,10 +99,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Error fetching public data:", error);
       } finally {
-        // Auth listener is set up after initial data load
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             setFirebaseUser(user);
-            // We can now safely say we are done with the initial loading phase
             setLoading(false);
         });
         return unsubscribe;
@@ -160,7 +158,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
       return {
         ...post,
-        media: post.media,
+        media: post.media || [],
+        timestamp: (post.timestamp as Timestamp)?.toDate() || new Date(),
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
@@ -236,9 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const userRef = doc(db, 'users', currentUser.id);
       await updateDoc(userRef, { postsCount: increment(1) });
       
-      const updatedUser = { ...currentUser, postsCount: currentUser.postsCount + 1 };
-      setCurrentUser(updatedUser);
-      setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? updatedUser : u));
+      setCurrentUser(prevUser => prevUser ? { ...prevUser, postsCount: prevUser.postsCount + 1 } : null);
 
     } catch (error) {
       console.error("Error adding post: ", error);
