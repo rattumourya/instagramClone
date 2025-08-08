@@ -160,6 +160,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
       return {
         ...post,
+        media: post.media,
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
