@@ -29,10 +29,10 @@ export function PostCard({ post }: { post: PostType }) {
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (newComment.trim()) {
+    if (newComment.trim() && currentUser) {
       const commentToAdd: CommentType = {
         id: `comment-${Date.now()}`,
-        text: newComment,
+        text: newComment.trim(),
         user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: new Date(),
       };
@@ -113,7 +113,7 @@ export function PostCard({ post }: { post: PostType }) {
             )}
             
             <div className="text-xs text-muted-foreground uppercase">
-                {formatDistanceToNow(new Date(post.timestamp), { addSuffix: true })}
+                {post.timestamp ? formatDistanceToNow(new Date(post.timestamp), { addSuffix: true }) : 'just now'}
             </div>
         </div>
 

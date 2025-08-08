@@ -1,3 +1,6 @@
+
+import type { Timestamp } from 'firebase/firestore';
+
 export interface User {
   id: string;
   username: string;
@@ -13,7 +16,7 @@ export interface Comment {
   id: string;
   text: string;
   user: Pick<User, 'username' | 'avatarUrl'>;
-  timestamp: Date;
+  timestamp: Date | Timestamp;
 }
 
 export interface Post {
@@ -21,7 +24,7 @@ export interface Post {
   user: Pick<User, 'username' | 'avatarUrl'>;
   imageUrl: string;
   caption: string;
-  timestamp: Date;
+  timestamp: Date | Timestamp;
   likes: number;
   comments: Comment[];
   isLiked: boolean;

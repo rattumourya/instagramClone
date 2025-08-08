@@ -1,3 +1,7 @@
+
+// This file is now mainly for type definitions and can be used for seeding the database.
+// The application now fetches data from Firestore.
+
 import type { User, Post, Comment } from './types';
 
 export const users: User[] = [
