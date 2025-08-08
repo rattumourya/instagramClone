@@ -14,7 +14,8 @@ export interface User {
 export interface Comment {
   id: string;
   text: string;
-  user: Pick<User, 'id' | 'username' | 'avatarUrl'>;
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'avatarUrl'>; // This will be added client-side
   timestamp: Date;
 }
 

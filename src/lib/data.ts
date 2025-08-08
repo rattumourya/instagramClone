@@ -37,17 +37,17 @@ export const users: User[] = [
   },
 ];
 
-const mockComments: Comment[] = [
+const mockComments: Omit<Comment, 'user'>[] = [
     {
       id: 'comment-1',
       text: 'This is an amazing shot!',
-      user: { id: 'user-2', username: 'vincent_van_draw', avatarUrl: 'https://placehold.co/150x150.png' },
+      userId: 'user-2',
       timestamp: new Date(Date.now() - 1000 * 60 * 5),
     },
     {
       id: 'comment-2',
       text: 'Love the colors here.',
-      user: { id: 'user-3', username: 'tech_tesla', avatarUrl: 'https://placehold.co/150x150.png' },
+      userId: 'user-3',
       timestamp: new Date(Date.now() - 1000 * 60 * 2),
     },
 ];

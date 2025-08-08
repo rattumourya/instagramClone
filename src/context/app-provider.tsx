@@ -30,9 +30,9 @@ import {
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-
+type RawComment = Omit<Comment, 'user'>;
+type RawPost = Omit<Post, 'user' | 'comments'> & { comments: RawComment[] };
 type NewPost = { imageUrl: string, caption: string };
-
 type UpdatePayload = ((post: Post) => Partial<Post>) | { newComment: string };
 
 interface AppContextType {
@@ -49,27 +49,30 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const unknownUser = {
+  id: 'unknown',
+  username: 'unknown',
+  avatarUrl: 'https://placehold.co/150x150.png',
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [rawPosts, setRawPosts] = useState<Omit<Post, 'user'>[]>([]);
+  const [rawPosts, setRawPosts] = useState<RawPost[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const fetchAllData = useCallback(async () => {
-    // Fetch all users
     const usersCollection = collection(db, 'users');
     const usersSnapshot = await getDocs(usersCollection);
     const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
     setUsers(usersList);
 
-    // Fetch all posts
     const postsCollection = collection(db, 'posts');
     const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
     const postsSnapshot = await getDocs(postsQuery);
     const postsList = postsSnapshot.docs.map(doc => {
       const data = doc.data();
-      // Convert Firestore Timestamps to JS Date objects
       return {
         id: doc.id,
         ...data,
@@ -78,7 +81,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...c,
           timestamp: (c.timestamp as Timestamp).toDate()
         }))
-      } as Omit<Post, 'user'>;
+      } as RawPost;
     });
     setRawPosts(postsList);
   }, []);
@@ -91,11 +94,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          const userData = { id: userSnap.id, ...userSnap.data() } as User;
-          setCurrentUser(userData);
+          setCurrentUser({ id: userSnap.id, ...userSnap.data() } as User);
           await fetchAllData();
         } else {
-           console.error("User document not found in Firestore for uid:", firebaseUser.uid);
            setCurrentUser(null);
            setUsers([]);
            setRawPosts([]);
@@ -112,22 +113,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [fetchAllData]);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0 || rawPosts.length === 0) return [];
+    if (loading || users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
-    const unknownUser = { username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' };
-    const unknownCommentUser = { id: 'unknown', username: 'unknown', avatarUrl: 'https://placehold.co/150x150.png' };
   
-    const hydratedPosts = rawPosts.map(post => {
+    return rawPosts.map(post => {
       const postUser = userMap.get(post.userId) ?? unknownUser;
       
       const hydratedComments = post.comments.map(comment => {
-        const commentUser = userMap.get(comment.user.id);
+        const commentUser = userMap.get(comment.userId) ?? unknownUser;
         return {
           ...comment,
-          user: commentUser 
-            ? { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl } 
-            : unknownCommentUser
+          user: { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl }
         };
       });
   
@@ -137,13 +134,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl }
       };
     });
-
-    return hydratedPosts;
   }, [rawPosts, users, loading]);
 
 
   const signUp = async (email: string, username: string, password: string) => {
-    // Check if username already exists
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where("username", "==", username));
     const querySnapshot = await getDocs(q);
@@ -157,7 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newUser: User = {
       id: firebaseUser.uid,
       username,
-      name: username, // Default name to username
+      name: username,
       email,
       avatarUrl: 'https://placehold.co/150x150.png',
       bio: '',
@@ -167,7 +161,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    // Add new user to the local state to avoid a full refetch
     setUsers(prevUsers => [...prevUsers, newUser]);
     setCurrentUser(newUser);
     router.push('/');
@@ -186,7 +179,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
 
-
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {
@@ -202,8 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
 
-      // Optimistic update
-      const newPostForUI: Omit<Post, 'user'> = {
+      const newPostForUI: RawPost = {
         id: newPostRef.id,
         userId: currentUser.id,
         imageUrl: post.imageUrl,
@@ -226,19 +217,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const postToUpdate = rawPosts.find(p => p.id === postId);
     if (!postToUpdate) return;
   
-    // Handle comments
     if (typeof payload === 'object' && 'newComment' in payload) {
       const clientTimestamp = new Date();
-      const newCommentForUI: Comment = {
+      const newCommentForUI: RawComment = {
         id: `comment-${Date.now()}-${Math.random()}`,
         text: payload.newComment,
-        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        userId: currentUser.id,
         timestamp: clientTimestamp,
       };
 
       const newCommentForFirestore = {
         ...newCommentForUI,
-        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
@@ -250,9 +239,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
       updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
-    // Handle likes and other updates from a callback
     } else if (typeof payload === 'function') {
-        const newIsLiked = payload({ ...postToUpdate, user: { username: '', avatarUrl: '' } }).isLiked;
+        const fullPostForCallback = posts.find(p => p.id === postId);
+        if (!fullPostForCallback) return;
+
+        const newIsLiked = payload(fullPostForCallback).isLiked;
         if (newIsLiked === undefined) return;
 
         setRawPosts(prevPosts =>

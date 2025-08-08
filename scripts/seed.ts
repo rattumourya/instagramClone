@@ -29,7 +29,6 @@ async function seedDatabase() {
         timestamp: Timestamp.fromDate(post.timestamp as Date), // Convert Date to Firestore Timestamp
         comments: post.comments.map(c => ({
             ...c,
-            user: { id: c.user.id, username: c.user.username, avatarUrl: c.user.avatarUrl },
             timestamp: Timestamp.fromDate(c.timestamp as Date) // Convert Date to Firestore Timestamp
         }))
     };
