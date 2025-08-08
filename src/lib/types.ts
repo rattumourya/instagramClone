@@ -14,7 +14,7 @@ export interface User {
 export interface Comment {
   id: string;
   text: string;
-  user: Pick<User, 'username' | 'avatarUrl'>;
+  user: Pick<User, 'id' | 'username' | 'avatarUrl'>;
   timestamp: Date;
 }
 

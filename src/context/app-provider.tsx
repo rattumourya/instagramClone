@@ -63,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const usersSnapshot = await getDocs(usersCollection);
       const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
       setUsers(usersList);
+      const userMap = new Map(usersList.map(user => [user.id, user]));
 
       // Fetch all posts
       const postsCollection = collection(db, 'posts');
@@ -75,10 +76,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           id: doc.id,
           ...data,
           timestamp: (data.timestamp as Timestamp).toDate(),
-          comments: data.comments.map((c: any) => ({
+          comments: data.comments.map((c: any) => {
+            const commentUser = userMap.get(c.user.id) || c.user;
+            return {
             ...c,
+            user: { id: commentUser.id, username: commentUser.username, avatarUrl: commentUser.avatarUrl },
             timestamp: (c.timestamp as Timestamp).toDate()
-          }))
+          }})
         } as Omit<Post, 'user'>;
       });
       setRawPosts(postsList);
@@ -213,12 +217,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newCommentForUI: Comment = {
         id: `comment-${Date.now()}-${Math.random()}`,
         text: payload.newComment,
-        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: clientTimestamp,
       };
 
       const newCommentForFirestore = {
-        ...newCommentForUI,
+        id: newCommentForUI.id,
+        text: newCommentForUI.text,
+        user: { id: currentUser.id, username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
