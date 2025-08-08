@@ -73,7 +73,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch public data (users and posts) concurrently
         const usersCollection = collection(db, 'users');
         const postsCollection = collection(db, 'posts');
         const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
@@ -99,11 +98,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as RawPost;
         });
         setRawPosts(postsList);
-
       } catch (error) {
         console.error("Error fetching public data:", error);
       } finally {
-        // Set up auth listener after public data is fetched
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
           if (firebaseUser) {
             const userRef = doc(db, 'users', firebaseUser.uid);
@@ -113,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
               setCurrentUser(fetchedUser);
             } else {
+               console.error("Authenticated user not found in Firestore, signing out.");
                setCurrentUser(null);
                await firebaseSignOut(auth);
             }
@@ -129,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    if (users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -152,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser, loading]);
+  }, [rawPosts, users, currentUser]);
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');
@@ -170,7 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       username,
       name: username,
       email,
-      avatarUrl: 'https://placehold.co/150x150.png',
+      avatarUrl: `https://placehold.co/150x150.png?text=${username.slice(0,2)}`,
       bio: '',
       postsCount: 0,
       followersCount: 0,
@@ -179,60 +177,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-    // Add new user to local state to avoid re-fetch
     setUsers(prev => [...prev, newUser]);
-    // The onAuthStateChanged listener will set the current user
     router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    // The onAuthStateChanged listener will set the current user
     router.push('/');
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
-    // The onAuthStateChanged listener will clear the current user
     router.push('/login');
   };
 
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {
-      // Create a server timestamp
       const timestamp = serverTimestamp();
       const newPostData = {
         userId: currentUser.id,
         imageUrl: post.imageUrl,
         caption: post.caption,
-        timestamp: timestamp, // Use server timestamp for firestore
+        timestamp: timestamp,
         likes: 0,
         comments: [],
       };
 
       const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
 
-      // Optimistically update UI
       const newPostForUI: RawPost = {
         id: newPostRef.id,
         userId: currentUser.id,
         imageUrl: post.imageUrl,
         caption: post.caption,
-        timestamp: new Date(), // Use client date for immediate UI update
+        timestamp: new Date(),
         likes: 0,
         comments: [],
       };
       setRawPosts(prevPosts => [newPostForUI, ...prevPosts]);
       
-      // Update user's post count in Firestore
       const userRef = doc(db, 'users', currentUser.id);
       await updateDoc(userRef, { postsCount: increment(1) });
       
-      // Update user's post count in local state
-      setCurrentUser(prevUser => prevUser ? { ...prevUser, postsCount: prevUser.postsCount + 1 } : null);
-      setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? {...u, postsCount: u.postsCount + 1} : u));
-
+      const updatedUser = { ...currentUser, postsCount: currentUser.postsCount + 1 };
+      setCurrentUser(updatedUser);
+      setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? updatedUser : u));
 
     } catch (error) {
       console.error("Error adding post: ", error);
@@ -244,7 +234,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const postRef = doc(db, 'posts', postId);
     const userRef = doc(db, 'users', currentUser.id);
   
-    // Handle adding a comment
     if (typeof payload === 'object' && 'newComment' in payload) {
       const clientTimestamp = new Date();
       const newCommentForUI: RawComment = {
@@ -259,26 +248,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: Timestamp.fromDate(clientTimestamp),
       };
   
-      // Optimistic UI update
       setRawPosts(prevPosts =>
         prevPosts.map(p =>
           p.id === postId ? { ...p, comments: [...(p.comments || []), newCommentForUI] } : p
         )
       );
   
-      // Update Firestore
       updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
   
-    // Handle liking/unliking a post
     } else if (typeof payload === 'function') {
         const fullPostForCallback = posts.find(p => p.id === postId);
         if (!fullPostForCallback) return;
 
-        const { isLiked: newIsLiked } = payload(fullPostForallback);
+        const { isLiked: newIsLiked } = payload(fullPostForCallback);
 
         if (newIsLiked === undefined) return;
 
-        // Optimistically update user and posts state
         setCurrentUser(prevUser => {
             if (!prevUser) return null;
             const currentLikedPosts = new Set(prevUser.likedPosts || []);
@@ -301,7 +286,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             })
         );
   
-        // Update Firestore
         updateDoc(postRef, {
             likes: increment(newIsLiked ? 1 : -1)
         });
