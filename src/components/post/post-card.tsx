@@ -31,14 +31,8 @@ export function PostCard({ post }: { post: PostType }) {
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (newComment.trim()) {
-      updatePost(post.id, (currentPost) => ({
-        ...currentPost,
-        comments: [
-            ...currentPost.comments,
-            // The app provider will construct the full comment object
-            { id: '', text: newComment.trim(), user: {username: '', avatarUrl: ''}, timestamp: new Date() }
-        ]
-      }));
+      // Pass only the text. The provider will construct the comment object.
+      updatePost(post.id, { newComment: newComment.trim() });
       setNewComment('');
     }
   };

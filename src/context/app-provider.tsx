@@ -21,12 +21,14 @@ import {
 
 type NewPost = Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked' | 'user'> & { user: { username: string, avatarUrl: string } };
 
+type UpdatePayload = ((post: Post) => Partial<Post>) | { newComment: string };
+
 interface AppContextType {
   posts: Post[];
   users: User[];
   currentUser: User | null;
   addPost: (post: Omit<NewPost, 'id' | 'timestamp' | 'likes' | 'comments' | 'isLiked'>) => Promise<void>;
-  updatePost: (postId: string, updater: (post: Post) => Partial<Post>) => void;
+  updatePost: (postId: string, payload: UpdatePayload) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -118,29 +120,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updatePost = (postId: string, updater: (post: Post) => Partial<Post>) => {
+  const updatePost = (postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
     const postRef = doc(db, 'posts', postId);
-    const postToUpdate = posts.find(p => p.id === postId);
-    if (!postToUpdate) return;
-    
-    const updates = updater(postToUpdate);
 
-    // Optimistically update local state for likes
-    if (updates.isLiked !== undefined) {
-        setPosts(prevPosts =>
-            prevPosts.map(p => p.id === postId ? { ...p, ...updates } : p)
-        );
-    }
-
-    // Update Firestore for likes
-    if(updates.isLiked !== undefined){
-        updateDoc(postRef, { likes: increment(updates.isLiked ? 1 : -1), isLiked: updates.isLiked });
-    }
-    
-    // Handle comments separately
-    if (updates.comments && updates.comments.length > postToUpdate.comments.length) {
-        const newCommentText = updates.comments[updates.comments.length - 1].text;
+    // Handle comments
+    if (typeof payload === 'object' && 'newComment' in payload) {
+        const newCommentText = payload.newComment;
         
         // Optimistic update for comments
         const commentForUI: Comment = {
@@ -158,9 +144,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
             id: `comment-${Date.now()}-${Math.random()}`,
             text: newCommentText,
             user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp() // This is the correct usage for updateDoc
         };
         updateDoc(postRef, { comments: arrayUnion(commentForFirestore) });
+
+    // Handle likes and other updates
+    } else if (typeof payload === 'function') {
+        const postToUpdate = posts.find(p => p.id === postId);
+        if (!postToUpdate) return;
+        const updates = payload(postToUpdate);
+
+        // Optimistically update local state
+        setPosts(prevPosts =>
+            prevPosts.map(p => p.id === postId ? { ...p, ...updates } : p)
+        );
+
+        // Update Firestore
+        const firestoreUpdates: Partial<Post> = {};
+        if (updates.isLiked !== undefined) {
+            firestoreUpdates.likes = increment(updates.isLiked ? 1 : -1);
+            firestoreUpdates.isLiked = updates.isLiked;
+        }
+        if (Object.keys(firestoreUpdates).length > 0) {
+            updateDoc(postRef, firestoreUpdates);
+        }
     }
   };
 
