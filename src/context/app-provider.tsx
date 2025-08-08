@@ -70,7 +70,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchPublicData = async () => {
+    const initializeApp = async () => {
+      setLoading(true);
+
+      // 1. Fetch all public data (users and posts) first, regardless of auth state.
+      // This is crucial for displaying public pages correctly for logged-out users.
       try {
         const usersCollection = collection(db, 'users');
         const postsCollection = collection(db, 'posts');
@@ -97,15 +101,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } as RawPost;
         });
         setRawPosts(postsList);
+
       } catch (error) {
         console.error("Error fetching public data:", error);
       }
-    };
-    
-    const initialize = async () => {
-      setLoading(true);
-      await fetchPublicData(); // Fetch public data first
 
+      // 2. After public data is fetched, set up the auth listener.
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
           const userRef = doc(db, 'users', firebaseUser.uid);
@@ -122,17 +123,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setCurrentUser(null);
         }
-        setLoading(false); // Set loading to false after auth state is determined
+        // 3. Set loading to false only after all data is fetched and auth state is determined.
+        setLoading(false);
       });
 
       return () => unsubscribe();
-    }
+    };
 
-    initialize();
+    initializeApp();
   }, []);
   
   const posts = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    // Memoization now correctly depends on all raw data and the current user.
+    if (users.length === 0) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
@@ -152,10 +155,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...post,
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id },
-        isLiked: likedPostsSet.has(post.id)
+        isLiked: likedPostsSet.has(post.id) // `isLiked` is now correctly derived from the current user.
       };
     });
-  }, [rawPosts, users, currentUser, loading]);
+  }, [rawPosts, users, currentUser]);
 
   const signUp = async (email: string, username: string, password: string) => {
     const usersRef = collection(db, 'users');

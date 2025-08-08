@@ -52,7 +52,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       if (foundUser) {
         setUser(foundUser);
         // Filter posts based on the found user's ID.
-        // The `posts` from `useApp` are already fully hydrated.
+        // The `posts` from `useApp` are already fully hydrated with user info and `isLiked`.
         const foundPosts = posts.filter(p => p.userId === foundUser.id);
         setUserPosts(foundPosts);
       } else {
