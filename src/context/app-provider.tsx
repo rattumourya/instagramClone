@@ -57,45 +57,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchAllUsers = async () => {
-        const usersCollection = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersCollection);
-        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(usersList);
+    const fetchAllData = async () => {
+      // Fetch all users
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      setUsers(usersList);
+
+      // Fetch all posts
+      const postsCollection = collection(db, 'posts');
+      const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+      const postsSnapshot = await getDocs(postsQuery);
+      const postsList = postsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp,
+          comments: data.comments.map((c: any) => ({...c, timestamp: c.timestamp}))
+        } as Post;
+      });
+      setPosts(postsList);
     };
 
-    const fetchPosts = async () => {
-        const postsCollection = collection(db, 'posts');
-        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
-        const postsSnapshot = await getDocs(postsQuery);
-        const postsList = postsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: data.timestamp,
-            comments: data.comments.map((c: any) => ({...c, timestamp: c.timestamp}))
-          } as Post;
-        });
-        setPosts(postsList);
-    };
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userRef);
+        
         if (userSnap.exists()) {
-          setCurrentUser({ id: userSnap.id, ...userSnap.data() } as User);
+          const userData = { id: userSnap.id, ...userSnap.data() } as User;
+          setCurrentUser(userData);
+          // Only fetch all data if it hasn't been fetched yet
+          if (posts.length === 0 && users.length === 0) {
+            await fetchAllData();
+          }
         } else {
-           // This case can happen if a user is created in auth but not in firestore
-           // For now we'll just log it. A more robust solution might create the doc here.
            console.log("User document not found in Firestore for uid:", firebaseUser.uid);
            setCurrentUser(null);
         }
-        await fetchPosts();
-        await fetchAllUsers();
-
       } else {
         setCurrentUser(null);
         setPosts([]);
@@ -105,6 +106,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signUp = async (email: string, username: string, password: string) => {
@@ -132,6 +134,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+    // Add new user to the local state to avoid a full refetch
+    setUsers(prevUsers => [...prevUsers, newUser]);
     setCurrentUser(newUser);
     router.push('/');
   };
