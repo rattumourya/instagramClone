@@ -15,7 +15,7 @@ import type { Post as PostType, Comment as CommentType } from '@/lib/types';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 
 export function PostCard({ post }: { post: PostType }) {
-  const { updatePost } = useApp();
+  const { updatePost, currentUser } = useApp();
   const [newComment, setNewComment] = useState('');
 
   const handleLike = () => {
@@ -32,7 +32,7 @@ export function PostCard({ post }: { post: PostType }) {
       const commentToAdd: CommentType = {
         id: `comment-${Date.now()}`,
         text: newComment,
-        user: { username: 'mona_lisa', avatarUrl: 'https://placehold.co/150x150.png' },
+        user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
         timestamp: new Date(),
       };
       
