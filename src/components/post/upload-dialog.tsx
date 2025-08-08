@@ -29,10 +29,67 @@ import { useApp } from '@/context/app-provider';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
+const MAX_IMAGE_SIZE_BYTES = 1024 * 1024; // 1MB
+
 const formSchema = z.object({
   caption: z.string().min(1, { message: 'Caption is required.' }).max(2200),
   image: z.instanceof(File).refine(file => file.size > 0, { message: 'Image is required.' }),
 });
+
+const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = () => resolve(reader.result as string);
+  reader.onerror = error => reject(error);
+});
+
+const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+
+            if (width > height) {
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+            } else {
+                if (height > maxHeight) {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return reject(new Error('Could not get canvas context'));
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    return reject(new Error('Canvas to Blob conversion failed'));
+                }
+                const newFile = new File([blob], file.name, {
+                    type: file.type,
+                    lastModified: Date.now(),
+                });
+                URL.revokeObjectURL(img.src);
+                resolve(newFile);
+            }, file.type, 0.9); // 0.9 quality
+        };
+        img.onerror = (error) => {
+            URL.revokeObjectURL(img.src);
+            reject(error);
+        };
+    });
+};
+
 
 export function UploadDialog({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -44,18 +101,11 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       caption: '',
-      image: undefined,
+      image: new File([], ""),
     },
     mode: 'onChange',
   });
-
-  const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
-
+  
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!currentUser) {
       toast({
@@ -70,15 +120,37 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         form.setError('image', { type: 'manual', message: 'Image is required.' });
         return;
     }
-    const imageUrl = await toBase64(values.image);
-    addPost({
-      user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
-      imageUrl,
-      caption: values.caption,
-    });
-    form.reset();
-    setPreview(null);
-    setOpen(false);
+
+    try {
+        const resizedImage = await resizeImage(values.image, 1080, 1080); // Instagram's standard resolution
+        const imageUrl = await toBase64(resizedImage);
+        
+        if (imageUrl.length > MAX_IMAGE_SIZE_BYTES) {
+            toast({
+                variant: 'destructive',
+                title: 'Image Too Large',
+                description: 'The selected image is still too large after resizing. Please select a smaller file.',
+            });
+            return;
+        }
+
+        addPost({
+            user: { username: currentUser.username, avatarUrl: currentUser.avatarUrl },
+            imageUrl,
+            caption: values.caption,
+        });
+        form.reset();
+        setPreview(null);
+        setOpen(false);
+
+    } catch (error) {
+        console.error("Error processing image:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Error processing image',
+            description: 'There was an error while trying to process your image. Please try again.',
+        });
+    }
   }
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File | undefined) => void) => {
@@ -172,3 +244,5 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     </Dialog>
   );
 }
+
+    
