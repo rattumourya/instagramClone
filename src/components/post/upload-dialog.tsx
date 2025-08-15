@@ -37,80 +37,19 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { Media } from '@/lib/types';
 import { UploadCloud } from 'lucide-react';
-import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { v4 as uuidv4 } from 'uuid';
-
-
-const MAX_IMAGE_SIZE_BYTES = 1024 * 1024 * 5; // 5MB
-const MAX_VIDEO_SIZE_BYTES = 1024 * 1024 * 50; // 50MB
-
 
 const formSchema = z.object({
   caption: z.string().min(1, { message: 'Caption is required.' }).max(2200),
   files: z.array(z.instanceof(File)).min(1, 'Please select at least one file.'),
 });
 
-const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-  reader.onload = () => resolve(reader.result as string);
-  reader.onerror = error => reject(error);
-});
-
-const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
-    return new Promise((resolve, reject) => {
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let { width, height } = img;
-
-            const ratio = width / height;
-
-            if (width > maxWidth) {
-              width = maxWidth;
-              height = width / ratio;
-            }
-          
-            if (height > maxHeight) {
-              height = maxHeight;
-              width = height * ratio;
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return reject(new Error('Could not get canvas context'));
-            }
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    return reject(new Error('Canvas to Blob conversion failed'));
-                }
-                const newFile = new File([blob], file.name, {
-                    type: file.type,
-                    lastModified: Date.now(),
-                });
-                URL.revokeObjectURL(img.src);
-                resolve(newFile);
-            }, file.type, 0.9); // 0.9 quality
-        };
-        img.onerror = (error) => {
-            URL.revokeObjectURL(img.src);
-            reject(error);
-        };
-    });
-};
-
-const uploadFileToStorage = async (file: File, userId: string): Promise<string> => {
-    const fileId = uuidv4();
-    const storageRef = ref(storage, `posts/${userId}/${fileId}`);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
+// Since we are not uploading to a real backend, we will simulate it.
+const simulateFileUpload = async (file: File): Promise<string> => {
+    // In a real app, you would upload the file and get a URL.
+    // For local dev, we'll just use a placeholder.
+    console.log(`Simulating upload for ${file.name}`);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    return "https://placehold.co/1080x1080.png";
 };
 
 
@@ -131,7 +70,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // This is a cleanup effect.
-    // It runs when the component unmounts.
+    // It runs when the component unmounts or when previews change.
     return () => {
       previews.forEach(preview => URL.revokeObjectURL(preview));
     }
@@ -148,22 +87,10 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     }
 
     try {
+        // Simulate file uploads and get placeholder URLs
         const media: Media[] = await Promise.all(values.files.map(async (file) => {
-            if (file.type.startsWith('image/')) {
-                if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                    throw new Error(`Image ${file.name} is too large (max 5MB).`);
-                }
-                const resizedImage = await resizeImage(file, 1080, 1080);
-                const url = await uploadFileToStorage(resizedImage, currentUser.id);
-                return { url, type: 'image' as const };
-            } else if (file.type.startsWith('video/')) {
-                 if (file.size > MAX_VIDEO_SIZE_BYTES) { 
-                    throw new Error(`Video ${file.name} is too large (max 50MB).`);
-                }
-                const url = await uploadFileToStorage(file, currentUser.id);
-                return { url, type: 'video' as const };
-            }
-            throw new Error(`Unsupported file type: ${file.name}`);
+            const url = await simulateFileUpload(file);
+            return { url, type: file.type.startsWith('image/') ? 'image' as const : 'video' as const };
         }));
 
         await addPost({
@@ -179,14 +106,14 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         console.error("Error processing files:", error);
         toast({
             variant: 'destructive',
-            title: 'Error processing files',
-            description: error.message || 'There was an error while trying to process your files. Please try again.',
+            title: 'Error creating post',
+            description: error.message || 'There was an error while trying to create your post. Please try again.',
         });
     }
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File[]) => void) => {
-    // Revoke old previews
+    // Revoke old previews before creating new ones
     previews.forEach(preview => URL.revokeObjectURL(preview));
     
     const files = event.target.files;

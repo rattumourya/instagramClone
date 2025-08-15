@@ -1,0 +1,39 @@
+
+[
+  {
+    "id": "user-1",
+    "username": "ada_lovelace",
+    "name": "Ada Lovelace",
+    "email": "ada@example.com",
+    "avatarUrl": "https://placehold.co/150x150/d1d4f9/4f46e5?text=AL",
+    "bio": "The first computer programmer. Enchantress of Numbers.",
+    "postsCount": 2,
+    "followersCount": 1815,
+    "followingCount": 10,
+    "likedPosts": ["post-3"]
+  },
+  {
+    "id": "user-2",
+    "username": "grace_hopper",
+    "name": "Grace Hopper",
+    "email": "grace@example.com",
+    "avatarUrl": "https://placehold.co/150x150/f9d1d1/e54646?text=GH",
+    "bio": "Rear Admiral, U.S. Navy. Pioneered COBOL.",
+    "postsCount": 1,
+    "followersCount": 1906,
+    "followingCount": 5,
+    "likedPosts": []
+  },
+  {
+    "id": "user-3",
+    "username": "alan_turing",
+    "name": "Alan Turing",
+    "email": "alan@example.com",
+    "avatarUrl": "https://placehold.co/150x150/d1f9d3/46e55a?text=AT",
+    "bio": "Father of theoretical computer science and artificial intelligence.",
+    "postsCount": 0,
+    "followersCount": 1912,
+    "followingCount": 8,
+    "likedPosts": ["post-1", "post-2"]
+  }
+]

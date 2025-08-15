@@ -4,35 +4,12 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Post, User, Comment, Media } from '@/lib/types';
-import { db, auth } from '@/lib/firebase';
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-  query,
-  orderBy,
-  arrayUnion,
-  arrayRemove,
-  increment,
-  Timestamp,
-  setDoc,
-  getDoc,
-  where
-} from 'firebase/firestore';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  onAuthStateChanged,
-  signOut as firebaseSignOut,
-  User as FirebaseUser
-} from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { userId: string, timestamp: Timestamp, media: Media[], comments: RawComment[] | undefined };
+// --- MOCK DATA IMPORTS ---
+import initialPosts from '@/lib/data/posts.json';
+import initialUsers from '@/lib/data/users.json';
+
 type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
@@ -50,286 +27,206 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const unknownUser: Pick<User, 'id' | 'name' | 'username' | 'avatarUrl'> = {
-  id: 'unknown',
-  name: 'Unknown User',
-  username: 'unknown',
-  avatarUrl: 'https://placehold.co/150x150.png',
-};
-
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [rawPosts, setRawPosts] = useState<RawPost[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const fetchDataAndAuth = async () => {
-      setLoading(true);
-      try {
-        const usersCollection = collection(db, 'users');
-        const postsCollection = collection(db, 'posts');
-        const postsQuery = query(postsCollection, orderBy('timestamp', 'desc'));
+    // Simulate fetching data from a database
+    setLoading(true);
 
-        const [usersSnapshot, postsSnapshot] = await Promise.all([
-          getDocs(usersCollection),
-          getDocs(postsQuery)
-        ]);
-
-        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(usersList);
-
-        const postsList = postsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            media: data.media || [],
-            timestamp: data.timestamp instanceof Timestamp ? data.timestamp : Timestamp.fromDate(new Date()), // Keep as Firestore Timestamp
-            comments: (data.comments || []).map((c: any) => ({
-              ...c,
-              timestamp: c.timestamp instanceof Timestamp ? c.timestamp.toDate() : new Date(),
-            }))
-          } as RawPost;
-        });
-        setRawPosts(postsList);
-
-      } catch (error) {
-        console.error("Error fetching public data:", error);
-      } finally {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setFirebaseUser(user);
-            setLoading(false);
-        });
-        return unsubscribe;
-      }
-    };
+    const loadedUsers = initialUsers as User[];
     
-    fetchDataAndAuth();
-  }, []);
-  
-  useEffect(() => {
-    if (loading) return;
+    // We need to convert timestamp strings from JSON into Date objects
+    const loadedPosts = initialPosts.map(post => ({
+      ...post,
+      timestamp: new Date(post.timestamp),
+      comments: post.comments.map(comment => ({
+        ...comment,
+        timestamp: new Date(comment.timestamp),
+      })),
+      isLiked: false, // Default isLiked state
+    })) as Post[];
 
-    if (firebaseUser) {
-      const userFromList = users.find(u => u.id === firebaseUser.uid);
-      if (userFromList) {
-        setCurrentUser(userFromList);
-      } else {
-        console.warn("Authenticated user not found in initially fetched user list. This can happen on sign-up before a full refresh.");
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        getDoc(userRef).then(userSnap => {
-            if (userSnap.exists()) {
-                const fetchedUser = { id: userSnap.id, ...userSnap.data() } as User;
-                setCurrentUser(fetchedUser);
-                setUsers(prev => {
-                  if(prev.some(u => u.id === fetchedUser.id)) return prev;
-                  return [...prev, fetchedUser];
-                });
-            } else {
-                console.error("Authenticated user not found in Firestore, signing out.");
-                firebaseSignOut(auth);
-            }
-        });
+    setUsers(loadedUsers);
+    setPosts(loadedPosts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
+    
+    // Check for a logged-in user in localStorage
+    const storedUser = localStorage.getItem('focusgram_user');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      // Find the full user object from our "database"
+      const fullUser = loadedUsers.find(u => u.id === parsedUser.id);
+      if (fullUser) {
+        setCurrentUser(fullUser);
       }
-    } else {
-      setCurrentUser(null);
     }
-  }, [firebaseUser, users, loading]);
 
-  const posts: Post[] = useMemo(() => {
-    if (loading || users.length === 0) return [];
+    setLoading(false);
+  }, []);
+
+  const enhancedPosts = useMemo(() => {
+    if (loading) return [];
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
 
-    return rawPosts.map(post => {
-      const postUser = userMap.get(post.userId) ?? { ...unknownUser, id: post.userId };
+    return posts.map(post => {
+      const postUser = userMap.get(post.userId);
       
       const hydratedComments = (post.comments || []).map(comment => {
-        const commentUser = userMap.get(comment.userId) ?? { ...unknownUser, id: comment.userId };
+        const commentUser = userMap.get(comment.userId);
         return {
           ...comment,
-          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id, name: commentUser.name },
-          timestamp: comment.timestamp instanceof Timestamp ? comment.timestamp.toDate() : comment.timestamp
+          user: { 
+            id: commentUser?.id || 'unknown',
+            username: commentUser?.username || 'unknown', 
+            avatarUrl: commentUser?.avatarUrl || 'https://placehold.co/150x150.png'
+          },
         };
       });
   
       return {
         ...post,
-        media: post.media || [],
-        timestamp: post.timestamp.toDate(),
+        user: { 
+            id: postUser?.id || 'unknown',
+            username: postUser?.username || 'unknown',
+            avatarUrl: postUser?.avatarUrl || 'https://placehold.co/150x150.png' 
+        },
         comments: hydratedComments,
-        user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
       };
     });
-  }, [rawPosts, users, currentUser, loading]);
+  }, [posts, users, currentUser, loading]);
 
   const signUp = async (email: string, username: string, password: string) => {
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where("username", "==", username));
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        throw new Error("Username already exists.");
-      }
-
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const fbUser = userCredential.user;
-
-      const newUser: User = {
-        id: fbUser.uid,
-        username,
-        name: username,
-        email,
-        avatarUrl: `https://placehold.co/150x150.png?text=${username.slice(0, 2)}`,
-        bio: '',
-        postsCount: 0,
-        followersCount: 0,
-        followingCount: 0,
-        likedPosts: []
-      };
-
-      await setDoc(doc(db, 'users', fbUser.uid), newUser);
-      
-      // Manually update client-side state after signup
-      setUsers(prev => [...prev, newUser]);
-      setCurrentUser(newUser);
-
-      router.push('/');
-    } catch (error) {
-      console.error("Error signing up:", error);
-      throw error;
+    if (users.some(u => u.username === username)) {
+      throw new Error("Username already exists.");
     }
+    if (users.some(u => u.email === email)) {
+        throw new Error("Email already in use.");
+    }
+
+    const newUser: User = {
+      id: `user-${Date.now()}`,
+      username,
+      name: username,
+      email,
+      avatarUrl: `https://placehold.co/150x150.png?text=${username.slice(0, 2)}`,
+      bio: '',
+      postsCount: 0,
+      followersCount: 0,
+      followingCount: 0,
+      likedPosts: []
+    };
+    
+    setUsers(prev => [...prev, newUser]);
+    setCurrentUser(newUser);
+    localStorage.setItem('focusgram_user', JSON.stringify(newUser));
+    
+    router.push('/');
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/');
-    } catch (error) {
-      console.error("Error signing in:", error);
-      throw error;
+    // Note: In a real app, you'd hash and compare passwords. Here we just check for existence.
+    const user = users.find(u => u.email === email);
+    if (user) {
+        setCurrentUser(user);
+        localStorage.setItem('focusgram_user', JSON.stringify(user));
+        router.push('/');
+    } else {
+        throw new Error("Invalid email or password.");
     }
   };
 
   const signOut = async () => {
-    try {
-      await firebaseSignOut(auth);
-      router.push('/login');
-    } catch (error) {
-      console.error("Error signing out:", error);
-      throw error;
-    }
+    setCurrentUser(null);
+    localStorage.removeItem('focusgram_user');
+    router.push('/login');
   };
   
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
-    try {
-      const serverTimestampValue = serverTimestamp();
-      const newPostData = {
+
+    const newPostForUI: Post = {
+        id: `post-${Date.now()}`,
         userId: currentUser.id,
+        user: {
+            id: currentUser.id,
+            username: currentUser.username,
+            avatarUrl: currentUser.avatarUrl
+        },
         media: post.media,
         caption: post.caption,
-        timestamp: serverTimestampValue,
+        timestamp: new Date(),
         likes: 0,
         comments: [],
-      };
-
-      const newPostRef = await addDoc(collection(db, 'posts'), newPostData);
-
-      const newPostForUI: RawPost = {
-        id: newPostRef.id,
-        userId: currentUser.id,
-        media: post.media,
-        caption: post.caption,
-        timestamp: Timestamp.now(),
-        likes: 0,
-        comments: [],
-      };
-      setRawPosts(prevPosts => [newPostForUI, ...prevPosts]);
-      
-      const userRef = doc(db, 'users', currentUser.id);
-      await updateDoc(userRef, { postsCount: increment(1) });
-      
-      setCurrentUser(prevUser => prevUser ? { ...prevUser, postsCount: prevUser.postsCount + 1 } : null);
-
-    } catch (error) {
-      console.error("Error adding post: ", error);
-    }
+        isLiked: false,
+    };
+    
+    setPosts(prevPosts => [newPostForUI, ...prevPosts]);
   };
 
   const updatePost = useCallback((postId: string, payload: UpdatePayload) => {
     if (!currentUser) return;
-    const postRef = doc(db, 'posts', postId);
-    const userRef = doc(db, 'users', currentUser.id);
   
     if (typeof payload === 'object' && 'newComment' in payload) {
-      const clientTimestamp = new Date();
-      const newCommentForUI: RawComment = {
-        id: `comment-${Date.now()}-${Math.random()}`,
+      const newCommentForUI: Comment = {
+        id: `comment-${Date.now()}`,
         text: payload.newComment,
         userId: currentUser.id,
-        timestamp: clientTimestamp,
-      };
-
-      const newCommentForFirestore = {
-        ...newCommentForUI,
-        timestamp: Timestamp.fromDate(clientTimestamp),
+        user: {
+            id: currentUser.id,
+            username: currentUser.username,
+            avatarUrl: currentUser.avatarUrl
+        },
+        timestamp: new Date(),
       };
   
-      setRawPosts(prevPosts =>
+      setPosts(prevPosts =>
         prevPosts.map(p =>
-          p.id === postId ? { ...p, comments: [...(p.comments || []), newCommentForUI] } : p
+          p.id === postId ? { ...p, comments: [...p.comments, newCommentForUI] } : p
         )
       );
   
-      updateDoc(postRef, { comments: arrayUnion(newCommentForFirestore) });
-  
     } else if (typeof payload === 'function') {
-        const fullPostForCallback = posts.find(p => p.id === postId);
+        const fullPostForCallback = enhancedPosts.find(p => p.id === postId);
         if (!fullPostForCallback) return;
 
         const { isLiked: newIsLiked } = payload(fullPostForCallback);
 
         if (newIsLiked === undefined) return;
+        
+        // Update the isLiked status on the post object
+        setPosts(prevPosts =>
+            prevPosts.map(p =>
+              p.id === postId ? {
+                ...p,
+                isLiked: newIsLiked,
+                likes: newIsLiked ? p.likes + 1 : p.likes - 1
+              } : p
+            )
+          );
 
+        // Update the likedPosts array on the user object
         setCurrentUser(prevUser => {
             if (!prevUser) return null;
-            const currentLikedPosts = new Set(prevUser.likedPosts || []);
-            if (newIsLiked) {
-                currentLikedPosts.add(postId);
-            } else {
-                currentLikedPosts.delete(postId);
-            }
-            return { ...prevUser, likedPosts: Array.from(currentLikedPosts) };
-        });
-
-        setRawPosts(prevPosts =>
-            prevPosts.map(p => {
-                if (p.id === postId) {
-                    const currentLikes = p.likes || 0;
-                    const newLikes = newIsLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
-                    return { ...p, likes: newLikes };
-                }
-                return p;
-            })
-        );
-  
-        updateDoc(postRef, {
-            likes: increment(newIsLiked ? 1 : -1)
-        });
-        updateDoc(userRef, {
-            likedPosts: newIsLiked ? arrayUnion(postId) : arrayRemove(postId)
+            const newLikedPosts = newIsLiked
+                ? [...prevUser.likedPosts, postId]
+                : prevUser.likedPosts.filter(id => id !== postId);
+            
+            const updatedUser = { ...prevUser, likedPosts: newLikedPosts };
+            localStorage.setItem('focusgram_user', JSON.stringify(updatedUser));
+            return updatedUser;
         });
     }
-  }, [currentUser, posts]);
+  }, [currentUser, enhancedPosts]);
 
   return (
-    <AppContext.Provider value={{ posts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
+    <AppContext.Provider value={{ posts: enhancedPosts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
       {children}
     </AppContext.Provider>
   );
