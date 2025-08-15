@@ -13,6 +13,7 @@ import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
 import type { Post as PostType } from '@/lib/types';
 import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import {
   Carousel,
   CarouselContent,
@@ -28,6 +29,7 @@ export function PostCard({ post }: { post: PostType }) {
   const [showAllComments, setShowAllComments] = useState(false);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
   const [currentSlide, setCurrentSlide] = useState(0)
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!carouselApi) return
@@ -63,6 +65,34 @@ export function PostCard({ post }: { post: PostType }) {
       setNewComment('');
     }
   };
+
+  const handleShare = async () => {
+    const postUrl = `${window.location.origin}/#${post.id}`;
+    const shareData = {
+        title: 'Focusgram Post',
+        text: `Check out this post by ${post.user.username}`,
+        url: postUrl,
+    };
+
+    try {
+        if (navigator.share) {
+            await navigator.share(shareData);
+        } else {
+            await navigator.clipboard.writeText(postUrl);
+            toast({
+                title: 'Link Copied',
+                description: 'The post link has been copied to your clipboard.',
+            });
+        }
+    } catch (error) {
+        console.error('Error sharing:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not share the post at this time.',
+        });
+    }
+};
   
   const commentsToShow = showAllComments ? post.comments : post.comments.slice(0, 2);
 
@@ -136,7 +166,7 @@ export function PostCard({ post }: { post: PostType }) {
                     <Button variant="ghost" size="icon" onClick={() => document.getElementById(`comment-input-${post.id}`)?.focus()}>
                         <MessageCircle className="h-6 w-6" />
                     </Button>
-                     <Button variant="ghost" size="icon">
+                     <Button variant="ghost" size="icon" onClick={handleShare}>
                         <Send className="h-6 w-6" />
                     </Button>
                 </div>
