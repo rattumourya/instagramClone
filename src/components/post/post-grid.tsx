@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, MessageCircle, Files } from 'lucide-react';
+import { Files } from 'lucide-react';
 import type { Post } from '@/lib/types';
 
 export function PostGrid({ posts }: { posts: Post[] }) {
@@ -19,48 +19,37 @@ export function PostGrid({ posts }: { posts: Post[] }) {
   return (
     <div className="grid grid-cols-3 gap-1 md:gap-4">
       {posts.map(post => (
-        <Link key={post.id} href={`/#${post.id}`}>
-            <div className="group relative aspect-square cursor-pointer">
-              {post.media[0].type === 'image' ? (
-                post.media[0].url.startsWith('blob:') ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={post.media[0].url}
-                        alt="Post media"
-                        className="object-cover w-full h-full"
-                    />
-                ) : (
-                    <Image
-                        src={post.media[0].url}
-                        alt="Post image"
-                        fill
-                        className="object-cover"
-                        data-ai-hint="landscape photo"
-                    />
-                )
+        <Link key={post.id} href={`/#${post.id}`} className="group relative aspect-square cursor-pointer">
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            {post.media[0].type === 'image' ? (
+              post.media[0].url.startsWith('blob:') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                      src={post.media[0].url}
+                      alt="Post media"
+                      className="object-cover w-full h-full"
+                  />
               ) : (
-                <video
-                  src={post.media[0].url}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                />
-              )}
+                  <Image
+                      src={post.media[0].url}
+                      alt="Post image"
+                      fill
+                      className="object-cover"
+                      data-ai-hint="landscape photo"
+                  />
+              )
+            ) : (
+              <video
+                src={post.media[0].url}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+              />
+            )}
 
-              {post.media.length > 1 && (
-                <Files className="absolute top-2 right-2 h-5 w-5 text-white drop-shadow-lg" />
-              )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-6 text-white">
-                <div className="flex items-center gap-2 font-bold">
-                  <Heart className="h-6 w-6" />
-                  <span>{post.likes.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2 font-bold">
-                  <MessageCircle className="h-6 w-6" />
-                  <span>{post.comments.length}</span>
-                </div>
-              </div>
-            </div>
+            {post.media.length > 1 && (
+              <Files className="absolute top-2 right-2 h-5 w-5 text-white drop-shadow-lg" />
+            )}
         </Link>
       ))}
     </div>

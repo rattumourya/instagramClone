@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/app-provider';
 import { cn } from '@/lib/utils';
 import type { Post as PostType } from '@/lib/types';
-import { Bookmark, Heart, MessageCircle, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bookmark, Heart, MessageCircle, Send } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
