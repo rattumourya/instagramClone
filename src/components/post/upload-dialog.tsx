@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -128,6 +128,14 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     },
     mode: 'onChange',
   });
+
+  useEffect(() => {
+    // This is a cleanup effect.
+    // It runs when the component unmounts.
+    return () => {
+      previews.forEach(preview => URL.revokeObjectURL(preview));
+    }
+  }, [previews]);
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!currentUser) {
@@ -178,6 +186,9 @@ export function UploadDialog({ children }: { children: ReactNode }) {
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: File[]) => void) => {
+    // Revoke old previews
+    previews.forEach(preview => URL.revokeObjectURL(preview));
+    
     const files = event.target.files;
     if (files) {
       const fileArray = Array.from(files);
@@ -233,15 +244,12 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                                                     width={400}
                                                     height={400}
                                                     className="h-full w-full object-contain rounded-md"
-                                                    onLoad={() => URL.revokeObjectURL(src)}
-                                                    onError={() => URL.revokeObjectURL(src)}
                                                 />
                                             ) : (
                                                 <video
                                                     src={src}
                                                     controls
                                                     className="h-full w-full object-contain rounded-md"
-                                                    onCanPlay={() => URL.revokeObjectURL(src)}
                                                 />
                                             )}
                                         </CarouselItem>
