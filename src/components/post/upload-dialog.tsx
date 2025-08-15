@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type ReactNode, useEffect } from 'react';
+import { useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -63,13 +63,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     },
     mode: 'onChange',
   });
-
-  // Effect to clean up object URLs when the dialog closes or files change
-  useEffect(() => {
-    return () => {
-      previews.forEach(preview => URL.revokeObjectURL(preview));
-    }
-  }, [previews]);
   
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!currentUser) {
@@ -96,8 +89,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         // Don't revoke URLs here, they are needed for display in the feed.
         // They will be lost on page refresh anyway, which is expected for this local-only setup.
         
-        form.reset();
-        setPreviews([]);
+        resetDialog();
         setOpen(false);
 
     } catch (error: any) {
@@ -129,7 +121,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
 
   const resetDialog = () => {
     form.reset();
-    previews.forEach(preview => URL.revokeObjectURL(preview)); // Clean up on close
     setPreviews([]);
   }
 
