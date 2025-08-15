@@ -20,7 +20,6 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import {
@@ -43,13 +42,9 @@ const formSchema = z.object({
   files: z.array(z.instanceof(File)).min(1, 'Please select at least one file.'),
 });
 
-// Since we are not uploading to a real backend, we will simulate it.
-const simulateFileUpload = async (file: File): Promise<string> => {
-    // In a real app, you would upload the file and get a URL.
-    // For local dev, we'll just use a placeholder.
-    console.log(`Simulating upload for ${file.name}`);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-    return "https://placehold.co/1080x1080.png";
+// For local dev, we will use Object URLs to display media without a real backend.
+const getLocalMediaUrl = (file: File): string => {
+  return URL.createObjectURL(file);
 };
 
 
@@ -68,9 +63,8 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     mode: 'onChange',
   });
 
+  // Effect to clean up object URLs when the dialog closes or files change
   useEffect(() => {
-    // This is a cleanup effect.
-    // It runs when the component unmounts or when previews change.
     return () => {
       previews.forEach(preview => URL.revokeObjectURL(preview));
     }
@@ -87,16 +81,19 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     }
 
     try {
-        // Simulate file uploads and get placeholder URLs
-        const media: Media[] = await Promise.all(values.files.map(async (file) => {
-            const url = await simulateFileUpload(file);
+        // Since this is local, we just use the Object URLs we already created for previews.
+        const media: Media[] = values.files.map((file) => {
+            const url = getLocalMediaUrl(file);
             return { url, type: file.type.startsWith('image/') ? 'image' as const : 'video' as const };
-        }));
+        });
 
         await addPost({
             media,
             caption: values.caption,
         });
+        
+        // Don't revoke URLs here, they are needed for display in the feed.
+        // They will be lost on page refresh anyway, which is expected for this local-only setup.
         
         form.reset();
         setPreviews([]);
@@ -131,6 +128,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
 
   const resetDialog = () => {
     form.reset();
+    previews.forEach(preview => URL.revokeObjectURL(preview)); // Clean up on close
     setPreviews([]);
   }
 
@@ -146,7 +144,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Create new post</DialogTitle>
           <DialogDescription>
-            Select photos and videos to share.
+            Select photos and videos to share. These will be lost on refresh.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
