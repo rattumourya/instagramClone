@@ -37,8 +37,14 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import type { Media } from '@/lib/types';
 import { UploadCloud } from 'lucide-react';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const MAX_IMAGE_SIZE_BYTES = 1024 * 1024 * 5; // 5MB
+const MAX_VIDEO_SIZE_BYTES = 1024 * 1024 * 50; // 50MB
+
 
 const formSchema = z.object({
   caption: z.string().min(1, { message: 'Caption is required.' }).max(2200),
@@ -60,16 +66,16 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<F
             const canvas = document.createElement('canvas');
             let { width, height } = img;
 
-            if (width > height) {
-                if (width > maxWidth) {
-                    height = Math.round(height * (maxWidth / width));
-                    width = maxWidth;
-                }
-            } else {
-                if (height > maxHeight) {
-                    width = Math.round(width * (maxHeight / height));
-                    height = maxHeight;
-                }
+            const ratio = width / height;
+
+            if (width > maxWidth) {
+              width = maxWidth;
+              height = width / ratio;
+            }
+          
+            if (height > maxHeight) {
+              height = maxHeight;
+              width = height * ratio;
             }
 
             canvas.width = width;
@@ -99,9 +105,12 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<F
     });
 };
 
-// Placeholder function for Firebase Storage upload
-const uploadFileToStorage = async (file: File): Promise<string> => {
-    // TODO: Implement actual Firebase Storage upload here
+const uploadFileToStorage = async (file: File, userId: string): Promise<string> => {
+    const fileId = uuidv4();
+    const storageRef = ref(storage, `posts/${userId}/${fileId}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
 };
 
 
@@ -130,6 +139,8 @@ export function UploadDialog({ children }: { children: ReactNode }) {
       return;
     }
 
+    form.formState.isSubmitting = true;
+
     try {
         const media: Media[] = await Promise.all(values.files.map(async (file) => {
             if (file.type.startsWith('image/')) {
@@ -137,21 +148,23 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                     throw new Error(`Image ${file.name} is too large (max 5MB).`);
                 }
                 const resizedImage = await resizeImage(file, 1080, 1080);
-                const url = await uploadFileToStorage(resizedImage); // Upload to storage
+                const url = await uploadFileToStorage(resizedImage, currentUser.id);
                 return { url, type: 'image' as const };
             } else if (file.type.startsWith('video/')) {
-                 if (file.size > MAX_IMAGE_SIZE_BYTES * 2) { // Arbitrary higher limit for video, adjust as needed
-                    throw new Error(`Video ${file.name} is too large.`);
+                 if (file.size > MAX_VIDEO_SIZE_BYTES) { 
+                    throw new Error(`Video ${file.name} is too large (max 50MB).`);
                 }
+                const url = await uploadFileToStorage(file, currentUser.id);
                 return { url, type: 'video' as const };
             }
             throw new Error(`Unsupported file type: ${file.name}`);
         }));
 
-        addPost({
+        await addPost({
             media,
             caption: values.caption,
         });
+        
         form.reset();
         setPreviews([]);
         setOpen(false);
@@ -163,6 +176,8 @@ export function UploadDialog({ children }: { children: ReactNode }) {
             title: 'Error processing files',
             description: error.message || 'There was an error while trying to process your files. Please try again.',
         });
+    } finally {
+        form.formState.isSubmitting = false;
     }
   }
 
@@ -278,7 +293,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
             />
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isValid || !currentUser}>
-                Share
+                {form.formState.isSubmitting ? 'Sharing...' : 'Share'}
               </Button>
             </DialogFooter>
           </form>
