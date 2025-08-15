@@ -139,8 +139,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
       return;
     }
 
-    form.formState.isSubmitting = true;
-
     try {
         const media: Media[] = await Promise.all(values.files.map(async (file) => {
             if (file.type.startsWith('image/')) {
@@ -176,8 +174,6 @@ export function UploadDialog({ children }: { children: ReactNode }) {
             title: 'Error processing files',
             description: error.message || 'There was an error while trying to process your files. Please try again.',
         });
-    } finally {
-        form.formState.isSubmitting = false;
     }
   }
 
