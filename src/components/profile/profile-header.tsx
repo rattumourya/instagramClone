@@ -29,7 +29,7 @@ export function ProfileHeader({ user }: { user: User }) {
         </div>
         <div>
           <h1 className="font-semibold">{user.name}</h1>
-          <p className="text-muted-foreground">{user.bio}</p>
+          {user.bio && <p className="text-muted-foreground">{user.bio}</p>}
         </div>
       </div>
     </div>
