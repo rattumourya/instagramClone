@@ -11,7 +11,8 @@
     "followersCount": 1815,
     "followingCount": 1,
     "likedPosts": ["post-3", "post-4"],
-    "following": ["user-2"]
+    "following": ["user-2"],
+    "savedPosts": ["post-2", "post-5"]
   },
   {
     "id": "user-2",
@@ -24,7 +25,8 @@
     "followersCount": 1906,
     "followingCount": 1,
     "likedPosts": [],
-    "following": ["user-3"]
+    "following": ["user-3"],
+    "savedPosts": []
   },
   {
     "id": "user-3",
@@ -37,6 +39,7 @@
     "followersCount": 1912,
     "followingCount": 1,
     "likedPosts": ["post-1", "post-2"],
-    "following": ["user-1"]
+    "following": ["user-1"],
+    "savedPosts": ["post-1"]
   }
 ]

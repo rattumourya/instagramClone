@@ -24,6 +24,7 @@ interface AppContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   toggleFollow: (userIdToFollow: string) => void;
+  toggleSavePost: (postId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,6 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         timestamp: new Date(comment.timestamp),
       })),
       isLiked: false, // Default isLiked state
+      isSaved: false, // Default isSaved state
     })) as Post[];
 
     setUsers(loadedUsers);
@@ -81,6 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     const userMap = new Map(users.map(user => [user.id, user]));
     const likedPostsSet = new Set(currentUser?.likedPosts || []);
+    const savedPostsSet = new Set(currentUser?.savedPosts || []);
 
     return posts.map(post => {
       const postUser = userMap.get(post.userId);
@@ -105,7 +108,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             avatarUrl: postUser?.avatarUrl || 'https://placehold.co/150x150.png' 
         },
         comments: hydratedComments,
-        isLiked: likedPostsSet.has(post.id)
+        isLiked: likedPostsSet.has(post.id),
+        isSaved: savedPostsSet.has(post.id),
       };
     });
   }, [posts, users, currentUser, loading]);
@@ -130,6 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       followingCount: 0,
       likedPosts: [],
       following: [],
+      savedPosts: [],
     };
     
     setUsers(prev => [...prev, newUser]);
@@ -174,6 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         likes: 0,
         comments: [],
         isLiked: false,
+        isSaved: false,
     };
     
     setPosts(prevPosts => [newPostForUI, ...prevPosts]);
@@ -281,8 +287,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, [currentUser]);
 
+  const toggleSavePost = useCallback((postId: string) => {
+    if (!currentUser) return;
+
+    const isSaved = currentUser.savedPosts.includes(postId);
+    const newSavedPosts = isSaved
+      ? currentUser.savedPosts.filter(id => id !== postId)
+      : [...currentUser.savedPosts, postId];
+
+    setCurrentUser(prevUser => {
+      if (!prevUser) return null;
+      const updatedUser = { ...prevUser, savedPosts: newSavedPosts };
+      localStorage.setItem('focusgram_user', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
+        p.id === postId ? { ...p, isSaved: !isSaved } : p
+      )
+    );
+  }, [currentUser]);
+
   return (
-    <AppContext.Provider value={{ posts: enhancedPosts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut, toggleFollow }}>
+    <AppContext.Provider value={{ posts: enhancedPosts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut, toggleFollow, toggleSavePost }}>
       {children}
     </AppContext.Provider>
   );

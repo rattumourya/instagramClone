@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/carousel"
 
 export function PostCard({ post }: { post: PostType }) {
-  const { updatePost } = useApp();
+  const { updatePost, toggleSavePost } = useApp();
   const [newComment, setNewComment] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
   const [carouselApi, setCarouselApi] = useState<CarouselApi>()
@@ -50,6 +50,10 @@ export function PostCard({ post }: { post: PostType }) {
       ...currentPost,
       isLiked: !currentPost.isLiked,
     }));
+  };
+
+  const handleSave = () => {
+    toggleSavePost(post.id);
   };
 
   const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -136,8 +140,8 @@ export function PostCard({ post }: { post: PostType }) {
                         <Send className="h-6 w-6" />
                     </Button>
                 </div>
-                <Button variant="ghost" size="icon">
-                    <Bookmark className="h-6 w-6" />
+                <Button variant="ghost" size="icon" onClick={handleSave}>
+                    <Bookmark className={cn('h-6 w-6 transition-all duration-200 ease-in-out', post.isSaved ? 'fill-foreground text-foreground' : 'text-foreground')} />
                 </Button>
             </div>
 

@@ -11,6 +11,7 @@ export interface User {
   followingCount: number;
   likedPosts: string[]; // Array of liked post IDs
   following: string[]; // Array of user IDs the user is following
+  savedPosts: string[]; // Array of saved post IDs
 }
 
 export interface Comment {
@@ -36,4 +37,5 @@ export interface Post {
   likes: number;
   comments: Comment[];
   isLiked: boolean; // This will be determined client-side per user
+  isSaved: boolean; // This will be determined client-side per user
 }
