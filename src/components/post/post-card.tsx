@@ -83,12 +83,22 @@ export function PostCard({ post }: { post: PostType }) {
                       <CarouselItem key={index}>
                          <div className="relative w-full h-full aspect-square">
                             {mediaItem.type === 'image' ? (
-                                <Image
-                                  src={mediaItem.url}
-                                  alt={`Post media ${index + 1}`}
-                                  fill
-                                  className="object-cover"
-                                  data-ai-hint="landscape photo" />
+                                mediaItem.url.startsWith('blob:') ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={mediaItem.url}
+                                      alt={`Post media ${index + 1}`}
+                                      className="object-cover w-full h-full"
+                                    />
+                                ) : (
+                                    <Image
+                                      src={mediaItem.url}
+                                      alt={`Post media ${index + 1}`}
+                                      fill
+                                      className="object-cover"
+                                      data-ai-hint="landscape photo"
+                                    />
+                                )
                             ) : (
                               <video src={mediaItem.url} controls className="w-full h-full object-cover" />
                             )}
