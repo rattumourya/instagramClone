@@ -99,6 +99,11 @@ const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<F
     });
 };
 
+// Placeholder function for Firebase Storage upload
+const uploadFileToStorage = async (file: File): Promise<string> => {
+    // TODO: Implement actual Firebase Storage upload here
+};
+
 
 export function UploadDialog({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -128,15 +133,14 @@ export function UploadDialog({ children }: { children: ReactNode }) {
     try {
         const media: Media[] = await Promise.all(values.files.map(async (file) => {
             if (file.type.startsWith('image/')) {
-                const resizedImage = await resizeImage(file, 1080, 1080);
-                const url = await toBase64(resizedImage);
-                if (url.length > MAX_IMAGE_SIZE_BYTES) {
-                  throw new Error(`Image ${file.name} is too large after resizing.`);
+                if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                    throw new Error(`Image ${file.name} is too large (max 5MB).`);
                 }
+                const resizedImage = await resizeImage(file, 1080, 1080);
+                const url = await uploadFileToStorage(resizedImage); // Upload to storage
                 return { url, type: 'image' as const };
             } else if (file.type.startsWith('video/')) {
-                const url = await toBase64(file);
-                 if (url.length > MAX_IMAGE_SIZE_BYTES) { // Add a reasonable size limit for videos too
+                 if (file.size > MAX_IMAGE_SIZE_BYTES * 2) { // Arbitrary higher limit for video, adjust as needed
                     throw new Error(`Video ${file.name} is too large.`);
                 }
                 return { url, type: 'video' as const };
@@ -210,7 +214,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                             <Carousel className="w-full h-full max-w-xs">
                                 <CarouselContent>
                                     {previews.map((src, index) => (
-                                        <CarouselItem key={index} className="flex items-center justify-center">
+                                        <CarouselItem key={index} className="flex items-center justify-center h-full">
                                             {field.value[index]?.type.startsWith('image/') ? (
                                                 <Image
                                                     src={src}
@@ -219,6 +223,7 @@ export function UploadDialog({ children }: { children: ReactNode }) {
                                                     height={400}
                                                     className="h-full w-full object-contain rounded-md"
                                                     onLoad={() => URL.revokeObjectURL(src)}
+                                                    onError={() => URL.revokeObjectURL(src)}
                                                 />
                                             ) : (
                                                 <video

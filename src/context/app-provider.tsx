@@ -32,7 +32,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 type RawComment = Omit<Comment, 'user'> & { userId: string };
-type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked' | 'timestamp'> & { userId: string, timestamp: Timestamp, media: Media[] };
+type RawPost = Omit<Post, 'user' | 'comments' | 'isLiked'> & { userId: string, timestamp: Timestamp, media: Media[], comments: RawComment[] | undefined };
 type NewPost = { media: Media[], caption: string };
 type UpdatePayload = ((post: Post) => Partial<Pick<Post, 'isLiked'>>) | { newComment: string };
 
@@ -87,10 +87,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             id: doc.id,
             ...data,
             media: data.media || [],
-            timestamp: (data.timestamp as Timestamp),
+            timestamp: data.timestamp instanceof Timestamp ? data.timestamp : Timestamp.fromDate(new Date()), // Keep as Firestore Timestamp
             comments: (data.comments || []).map((c: any) => ({
               ...c,
-              timestamp: (c.timestamp as Timestamp)?.toDate() || new Date()
+              timestamp: c.timestamp instanceof Timestamp ? c.timestamp.toDate() : new Date(),
             }))
           } as RawPost;
         });
@@ -152,14 +152,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const commentUser = userMap.get(comment.userId) ?? { ...unknownUser, id: comment.userId };
         return {
           ...comment,
-          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id, name: commentUser.name }
+          user: { username: commentUser.username, avatarUrl: commentUser.avatarUrl, id: commentUser.id, name: commentUser.name },
+          timestamp: comment.timestamp instanceof Timestamp ? comment.timestamp.toDate() : comment.timestamp
         };
       });
   
       return {
         ...post,
         media: post.media || [],
-        timestamp: post.timestamp?.toDate() || new Date(),
+        timestamp: post.timestamp.toDate(),
         comments: hydratedComments,
         user: { username: postUser.username, avatarUrl: postUser.avatarUrl, id: postUser.id, name: postUser.name },
         isLiked: likedPostsSet.has(post.id)
@@ -168,44 +169,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [rawPosts, users, currentUser, loading]);
 
   const signUp = async (email: string, username: string, password: string) => {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where("username", "==", username));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      throw new Error("Username already exists.");
-    }
-    
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const fbUser = userCredential.user;
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where("username", "==", username));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        throw new Error("Username already exists.");
+      }
 
-    const newUser: User = {
-      id: fbUser.uid,
-      username,
-      name: username,
-      email,
-      avatarUrl: `https://placehold.co/150x150.png?text=${username.slice(0,2)}`,
-      bio: '',
-      postsCount: 0,
-      followersCount: 0,
-      followingCount: 0,
-      likedPosts: []
-    };
-    
-    await setDoc(doc(db, 'users', fbUser.uid), newUser);
-    setUsers(prev => [...prev, newUser]);
-    router.push('/');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const fbUser = userCredential.user;
+
+      const newUser: User = {
+        id: fbUser.uid,
+        username,
+        name: username,
+        email,
+        avatarUrl: `https://placehold.co/150x150.png?text=${username.slice(0, 2)}`,
+        bio: '',
+        postsCount: 0,
+        followersCount: 0,
+        followingCount: 0,
+        likedPosts: []
+      };
+
+      await setDoc(doc(db, 'users', fbUser.uid), newUser);
+      
+      // Manually update client-side state after signup
+      setUsers(prev => [...prev, newUser]);
+      setCurrentUser(newUser);
+
+      router.push('/');
+    } catch (error) {
+      console.error("Error signing up:", error);
+      throw error;
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-    router.push('/');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/');
+    } catch (error) {
+      console.error("Error signing in:", error);
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
-    router.push('/login');
+    try {
+      await firebaseSignOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error("Error signing out:", error);
+      throw error;
+    }
   };
-
+  
   const addPost = async (post: NewPost) => {
     if (!currentUser) return;
     try {

@@ -4,9 +4,11 @@ import { notFound, useParams } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { PostGrid } from '@/components/post/post-grid';
 import { ProfileHeader } from '@/components/profile/profile-header';
-import { useApp } from '@/context/app-provider';
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import type { User, Post } from '@/lib/types';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 const ProfilePageSkeleton = () => (
   <main className="min-h-screen">
@@ -40,25 +42,59 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage() {
   const params = useParams();
   const username = params.username as string;
-  const { users, posts, loading } = useApp();
+  const [user, setUser] = useState<User | undefined>(undefined);
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const user: User | undefined = useMemo(() => {
-    if (loading) return undefined;
-    return users.find(u => u.username === username);
-  }, [username, users, loading]);
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      setLoading(true);
+      try {
+        // Fetch user by username
+        const usersRef = collection(db, 'users');
+        const userQuery = query(usersRef, where('username', '==', username), limit(1));
+        const userSnapshot = await getDocs(userQuery);
 
-  const userPosts: Post[] = useMemo(() => {
-    if (!user) return [];
-    return posts.filter(p => p.userId === user.id);
-  }, [posts, user]);
+        if (userSnapshot.empty) {
+          setUser(undefined);
+          setLoading(false);
+          return;
+        }
 
-  if (loading && !user) {
+        const userData = userSnapshot.docs[0].data() as User;
+        setUser({ id: userSnapshot.docs[0].id, ...userData });
+
+        // Fetch user's posts
+        const postsRef = collection(db, 'posts');
+        const postsQuery = query(postsRef, where('userId', '==', userSnapshot.docs[0].id), orderBy('timestamp', 'desc'));
+        const postsSnapshot = await getDocs(postsQuery);
+
+        const postsList: Post[] = postsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date(), // Safely convert Firestore Timestamp to Date
+        }) as Post);
+        setUserPosts(postsList);
+
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+        setUser(undefined); // Indicate user not found on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [username]); // Re-run effect when username changes
+
+  if (loading) {
     return <ProfilePageSkeleton />;
   }
 
   if (!user) {
     notFound();
   }
+
 
   return (
     <main className="min-h-screen">
