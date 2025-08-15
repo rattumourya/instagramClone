@@ -76,7 +76,7 @@ export function PostCard({ post }: { post: PostType }) {
         </div>
         
         {post.media && post.media.length > 0 && (
-            <div className="relative aspect-square w-full h-[400px]">
+            <div className="relative aspect-square w-full">
                 <Carousel setApi={setCarouselApi} className="w-full h-full">
                   <CarouselContent>
                     {post.media.map((mediaItem, index) => (
