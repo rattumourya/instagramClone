@@ -84,7 +84,11 @@ export function PostCard({ post }: { post: PostType }) {
                 description: 'The post link has been copied to your clipboard.',
             });
         }
-    } catch (error) {
+    } catch (error: any) {
+        // Silently fail if the user cancels the share dialog
+        if (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('canceled')) {
+          return;
+        }
         console.error('Error sharing:', error);
         toast({
             variant: 'destructive',
