@@ -10,7 +10,7 @@
     "postsCount": 2,
     "followersCount": 1815,
     "followingCount": 10,
-    "likedPosts": ["post-3"]
+    "likedPosts": ["post-3", "post-4"]
   },
   {
     "id": "user-2",
@@ -19,7 +19,7 @@
     "email": "grace@example.com",
     "avatarUrl": "https://placehold.co/150x150/f9d1d1/e54646?text=GH",
     "bio": "Rear Admiral, U.S. Navy. Pioneered COBOL.",
-    "postsCount": 1,
+    "postsCount": 2,
     "followersCount": 1906,
     "followingCount": 5,
     "likedPosts": []
@@ -31,7 +31,7 @@
     "email": "alan@example.com",
     "avatarUrl": "https://placehold.co/150x150/d1f9d3/46e55a?text=AT",
     "bio": "Father of theoretical computer science and artificial intelligence.",
-    "postsCount": 0,
+    "postsCount": 1,
     "followersCount": 1912,
     "followingCount": 8,
     "likedPosts": ["post-1", "post-2"]

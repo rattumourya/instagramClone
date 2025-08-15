@@ -52,6 +52,31 @@
       }
     ]
   },
+  {
+    "id": "post-4",
+    "userId": "user-2",
+    "media": [
+      {
+        "url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        "type": "video"
+      },
+      {
+        "url": "https://placehold.co/1080x1080/fde68a/854d0e.png",
+        "type": "image"
+      }
+    ],
+    "caption": "A demonstration of the first compiler in action. Transforming human language into machine code!",
+    "timestamp": "2024-05-20T11:00:00Z",
+    "likes": 1200,
+    "comments": [
+      {
+        "id": "comment-4",
+        "text": "Absolutely groundbreaking!",
+        "userId": "user-1",
+        "timestamp": "2024-05-20T12:30:00Z"
+      }
+    ]
+  },
    {
     "id": "post-3",
     "userId": "user-1",
@@ -64,6 +89,28 @@
     "caption": "The potential of this machine is boundless. It can weave algebraic patterns just as the Jacquard loom weaves flowers and leaves.",
     "timestamp": "2024-05-15T09:00:00Z",
     "likes": 250,
+    "comments": []
+  },
+  {
+    "id": "post-5",
+    "userId": "user-3",
+    "media": [
+      {
+        "url": "https://placehold.co/1080x1080/e0e7ff/4338ca.png",
+        "type": "image"
+      },
+      {
+        "url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "type": "video"
+      },
+      {
+        "url": "https://placehold.co/1080x1350/ccfbf1/0f766e.png",
+        "type": "image"
+      }
+    ],
+    "caption": "Exploring the concept of a Universal Machine. A single machine to compute any computable sequence.",
+    "timestamp": "2024-05-22T18:45:00Z",
+    "likes": 2500,
     "comments": []
   }
 ]
