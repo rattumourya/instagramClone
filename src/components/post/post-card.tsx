@@ -80,17 +80,19 @@ export function PostCard({ post }: { post: PostType }) {
                 <Carousel setApi={setCarouselApi} className="w-full h-full">
                   <CarouselContent>
                     {post.media.map((mediaItem, index) => (
-                      <CarouselItem key={index} className="relative w-full h-full">
-                        {mediaItem.type === 'image' ? (
-                            <Image
-                              src={mediaItem.url}
-                              alt={`Post media ${index + 1}`}
-                              fill
-                              className="object-cover"
-                              data-ai-hint="landscape photo" />
-                        ) : (
-                          <video src={mediaItem.url} controls className="w-full h-full object-cover" />
-                        )}
+                      <CarouselItem key={index}>
+                         <div className="relative w-full h-full aspect-square">
+                            {mediaItem.type === 'image' ? (
+                                <Image
+                                  src={mediaItem.url}
+                                  alt={`Post media ${index + 1}`}
+                                  fill
+                                  className="object-cover"
+                                  data-ai-hint="landscape photo" />
+                            ) : (
+                              <video src={mediaItem.url} controls className="w-full h-full object-cover" />
+                            )}
+                         </div>
                       </CarouselItem>
                     ))}
                   </CarouselContent>
