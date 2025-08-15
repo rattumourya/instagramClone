@@ -4,7 +4,7 @@
 import { Feed } from '@/components/feed';
 import { Header } from '@/components/layout/header';
 import { useApp } from '@/context/app-provider';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { PostSkeleton } from '@/components/post/post-skeleton';
 
@@ -17,6 +17,20 @@ export default function Home() {
       router.push('/login');
     }
   }, [currentUser, loading, router]);
+  
+  useEffect(() => {
+    if (loading) return;
+    const hash = window.location.hash;
+    if (hash) {
+      const element = document.getElementById(hash.substring(1));
+      if (element) {
+        // Use a timeout to ensure the element is painted before scrolling
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    }
+  }, [loading]);
 
   if (loading || !currentUser) {
     return (

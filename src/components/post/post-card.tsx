@@ -63,7 +63,7 @@ export function PostCard({ post }: { post: PostType }) {
   const commentsToShow = showAllComments ? post.comments : post.comments.slice(0, 2);
 
   return (
-    <Card className="w-full max-w-xl">
+    <Card id={post.id} className="w-full max-w-xl scroll-mt-20">
       <CardContent className="p-0">
         <div className="flex items-center gap-3 p-4">
           <Avatar className="h-9 w-9">
