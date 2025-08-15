@@ -67,7 +67,7 @@ export function Header() {
       <div className="container mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <Camera className="h-7 w-7 text-primary" />
-          <h1 className="text-xl font-bold tracking-tight text-primary font-headline">Focusgram</h1>
+          <h1 className="text-xl font-bold tracking-tight text-primary">Focusgram</h1>
         </Link>
 
         <div className="relative hidden w-full max-w-xs items-center sm:block">

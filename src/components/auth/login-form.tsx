@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -57,7 +58,7 @@ export function LoginForm() {
       <CardHeader className="text-center">
         <div className="flex justify-center items-center gap-2 mb-4">
             <Camera className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight text-primary font-headline">Focusgram</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">Focusgram</h1>
         </div>
         <CardTitle className="text-2xl">Log in to your account</CardTitle>
         <CardDescription>Enter your email and password to continue</CardDescription>
