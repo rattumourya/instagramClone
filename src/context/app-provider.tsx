@@ -168,6 +168,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     
     setPosts(prevPosts => [newPostForUI, ...prevPosts]);
+
+    // Update user's post count
+    const updatedUser = {
+      ...currentUser,
+      postsCount: currentUser.postsCount + 1,
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prevUsers =>
+      prevUsers.map(u => (u.id === currentUser.id ? updatedUser : u))
+    );
+    localStorage.setItem('focusgram_user', JSON.stringify(updatedUser));
   };
 
   const updatePost = useCallback((postId: string, payload: UpdatePayload) => {
