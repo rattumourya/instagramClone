@@ -229,7 +229,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             prevPosts.map(p =>
               p.id === postId ? {
                 ...p,
-                isLiked: newIsLiked,
                 likes: newIsLiked ? p.likes + 1 : p.likes - 1
               } : p
             )
@@ -301,12 +300,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('focusgram_user', JSON.stringify(updatedUser));
       return updatedUser;
     });
-
-    setPosts(prevPosts =>
-      prevPosts.map(p =>
-        p.id === postId ? { ...p, isSaved: !isSaved } : p
-      )
-    );
   }, [currentUser]);
 
   return (
