@@ -23,6 +23,7 @@ interface AppContextType {
   signUp: (email: string, username: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  toggleFollow: (userIdToFollow: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -61,7 +62,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Find the full user object from our "database"
       const fullUser = loadedUsers.find(u => u.id === parsedUser.id);
       if (fullUser) {
-        setCurrentUser(fullUser);
+        // Make sure the localStorage user data is in sync with the "DB"
+        const isFollowingSynced = JSON.stringify(fullUser.following) === JSON.stringify(parsedUser.following);
+        if (parsedUser && !isFollowingSynced) {
+          localStorage.setItem('focusgram_user', JSON.stringify(fullUser));
+          setCurrentUser(fullUser);
+        } else {
+          setCurrentUser(parsedUser);
+        }
       }
     }
 
@@ -120,7 +128,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       postsCount: 0,
       followersCount: 0,
       followingCount: 0,
-      likedPosts: []
+      likedPosts: [],
+      following: [],
     };
     
     setUsers(prev => [...prev, newUser]);
@@ -169,7 +178,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setPosts(prevPosts => [newPostForUI, ...prevPosts]);
 
-    // Update user's post count
     const updatedUser = {
       ...currentUser,
       postsCount: currentUser.postsCount + 1,
@@ -211,7 +219,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (newIsLiked === undefined) return;
         
-        // Update the isLiked status on the post object
         setPosts(prevPosts =>
             prevPosts.map(p =>
               p.id === postId ? {
@@ -222,7 +229,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             )
           );
 
-        // Update the likedPosts array on the user object
         setCurrentUser(prevUser => {
             if (!prevUser) return null;
             const newLikedPosts = newIsLiked
@@ -236,8 +242,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser, enhancedPosts]);
 
+  const toggleFollow = useCallback((userIdToFollow: string) => {
+    if (!currentUser) return;
+
+    const isFollowing = currentUser.following.includes(userIdToFollow);
+    let updatedCurrentUser;
+    
+    // Update current user's state
+    setCurrentUser(prevUser => {
+        if (!prevUser) return null;
+        updatedCurrentUser = {
+            ...prevUser,
+            following: isFollowing 
+                ? prevUser.following.filter(id => id !== userIdToFollow)
+                : [...prevUser.following, userIdToFollow],
+            followingCount: isFollowing 
+                ? prevUser.followingCount - 1
+                : prevUser.followingCount + 1,
+        };
+        localStorage.setItem('focusgram_user', JSON.stringify(updatedCurrentUser));
+        return updatedCurrentUser;
+    });
+
+    // Update both users in the main users list
+    setUsers(prevUsers => prevUsers.map(user => {
+        if (user.id === currentUser.id) {
+            return updatedCurrentUser!;
+        }
+        if (user.id === userIdToFollow) {
+            return {
+                ...user,
+                followersCount: isFollowing
+                    ? user.followersCount - 1
+                    : user.followersCount + 1,
+            };
+        }
+        return user;
+    }));
+  }, [currentUser]);
+
   return (
-    <AppContext.Provider value={{ posts: enhancedPosts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut }}>
+    <AppContext.Provider value={{ posts: enhancedPosts, users, currentUser, loading, addPost, updatePost, signUp, signIn, signOut, toggleFollow }}>
       {children}
     </AppContext.Provider>
   );

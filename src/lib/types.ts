@@ -10,6 +10,7 @@ export interface User {
   followersCount: number;
   followingCount: number;
   likedPosts: string[]; // Array of liked post IDs
+  following: string[]; // Array of user IDs the user is following
 }
 
 export interface Comment {
