@@ -19,13 +19,36 @@ export function PostGrid({ posts }: { posts: Post[] }) {
     <div className="grid grid-cols-3 gap-1 md:gap-4">
       {posts.map(post => (
         <div key={post.id} className="group relative aspect-square">
-          <Image
-            src={post.media[0].url}
-            alt="Post image"
-            fill
-            className="object-cover"
-            data-ai-hint="landscape photo"
-          />
+          {post.media[0].type === 'image' ? (
+            post.media[0].url.startsWith('blob:') ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={post.media[0].url}
+                    alt="Post media"
+                    className="object-cover w-full h-full"
+                />
+            ) : (
+                <Image
+                    src={post.media[0].url}
+                    alt="Post image"
+                    fill
+                    className="object-cover"
+                    data-ai-hint="landscape photo"
+                />
+            )
+          ) : (
+            <video
+              src={post.media[0].url}
+              className="w-full h-full object-cover"
+              // Muted and playsInline are good for autoplaying grid previews
+              muted
+              playsInline
+              // Optionally, you can add autoPlay and loop
+              // autoPlay
+              // loop
+            />
+          )}
+
           {post.media.length > 1 && (
             <Files className="absolute top-2 right-2 h-5 w-5 text-white drop-shadow-lg" />
           )}
