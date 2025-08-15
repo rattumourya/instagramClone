@@ -7,6 +7,8 @@ import { ProfileHeader } from '@/components/profile/profile-header';
 import { useState, useEffect } from 'react';
 import type { User, Post } from '@/lib/types';
 import { useApp } from '@/context/app-provider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Grid3x3, Bookmark } from 'lucide-react';
 
 const ProfilePageSkeleton = () => (
   <main className="min-h-screen">
@@ -40,11 +42,14 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage() {
   const params = useParams();
   const username = params.username as string;
-  const { users, posts: allPosts, loading: appLoading } = useApp();
+  const { users, posts: allPosts, loading: appLoading, currentUser } = useApp();
   
   const [user, setUser] = useState<User | undefined>(undefined);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [savedPosts, setSavedPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
     if (appLoading) return;
@@ -57,13 +62,20 @@ export default function ProfilePage() {
     if (profileUser) {
       const postsForUser = allPosts.filter(p => p.userId === profileUser.id);
       setUserPosts(postsForUser);
+      
+      if (currentUser && isOwnProfile) {
+        const userSavedPosts = allPosts.filter(p => currentUser.savedPosts.includes(p.id));
+        setSavedPosts(userSavedPosts);
+      }
+
     } else {
       setUserPosts([]);
+      setSavedPosts([]);
     }
     
     setLoading(false);
 
-  }, [username, users, allPosts, appLoading]);
+  }, [username, users, allPosts, appLoading, currentUser, isOwnProfile]);
 
   if (loading) {
     return <ProfilePageSkeleton />;
@@ -78,8 +90,34 @@ export default function ProfilePage() {
       <Header />
       <div className="container mx-auto max-w-5xl px-4">
         <ProfileHeader user={user} />
-        <hr className="my-4" />
-        <PostGrid posts={userPosts} />
+        
+        {isOwnProfile ? (
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="posts">
+                <Grid3x3 className="mr-2 h-4 w-4" />
+                POSTS
+              </TabsTrigger>
+              <TabsTrigger value="saved">
+                <Bookmark className="mr-2 h-4 w-4" />
+                SAVED
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="posts">
+              <hr className="my-4" />
+              <PostGrid posts={userPosts} />
+            </TabsContent>
+            <TabsContent value="saved">
+              <hr className="my-4" />
+              <PostGrid posts={savedPosts} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <>
+            <hr className="my-4" />
+            <PostGrid posts={userPosts} />
+          </>
+        )}
       </div>
     </main>
   );
