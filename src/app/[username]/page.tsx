@@ -66,14 +66,19 @@ export default function ProfilePage() {
 
         // Fetch user's posts
         const postsRef = collection(db, 'posts');
-        const postsQuery = query(postsRef, where('userId', '==', userSnapshot.docs[0].id), orderBy('timestamp', 'desc'));
+        // The query now only filters by userId. The sorting is done on the client.
+        const postsQuery = query(postsRef, where('userId', '==', userSnapshot.docs[0].id));
         const postsSnapshot = await getDocs(postsQuery);
 
         const postsList: Post[] = postsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date(), // Safely convert Firestore Timestamp to Date
+          timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date(),
         }) as Post);
+        
+        // Sort posts on the client-side
+        postsList.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
         setUserPosts(postsList);
 
       } catch (error) {
