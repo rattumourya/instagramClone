@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useMemo, useEffect } from 'react';
 import type { User as UserType } from '@/lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Skeleton } from '../ui/skeleton';
 
 const SearchResults = ({ users, onResultClick }: { users: UserType[], onResultClick: () => void }) => (
     <div className='divide-y max-h-80 overflow-y-auto'>
@@ -36,7 +37,7 @@ const SearchResults = ({ users, onResultClick }: { users: UserType[], onResultCl
 
 export function Header() {
     const router = useRouter();
-    const { currentUser, signOut, users } = useApp();
+    const { currentUser, signOut, users, loading: appLoading } = useApp();
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -70,28 +71,32 @@ export function Header() {
         </Link>
 
         <div className="relative hidden w-full max-w-xs items-center sm:block">
-            <Popover open={isSearchFocused && searchQuery.length > 0} onOpenChange={setIsSearchFocused}>
-                <PopoverTrigger asChild>
-                    <div className='relative w-full'>
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search" 
-                            className="pl-9"
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            onFocus={() => setIsSearchFocused(true)}
-                        />
-                        {searchQuery && (
-                            <Button variant="ghost" size="icon" className='h-7 w-7 absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full' onClick={clearSearch}>
-                                <X className='h-4 w-4 text-muted-foreground'/>
-                            </Button>
-                        )}
-                    </div>
-                </PopoverTrigger>
-                <PopoverContent className='w-[var(--radix-popover-trigger-width)] p-0' onOpenAutoFocus={(e) => e.preventDefault()}>
-                    <SearchResults users={filteredUsers} onResultClick={handleResultClick} />
-                </PopoverContent>
-            </Popover>
+            { appLoading ? (
+                <Skeleton className='h-10 w-full' />
+            ) : (
+                <Popover open={isSearchFocused && searchQuery.length > 0} onOpenChange={setIsSearchFocused}>
+                    <PopoverTrigger asChild>
+                        <div className='relative w-full'>
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search" 
+                                className="pl-9"
+                                value={searchQuery}
+                                onChange={handleSearchChange}
+                                onFocus={() => setIsSearchFocused(true)}
+                            />
+                            {searchQuery && (
+                                <Button variant="ghost" size="icon" className='h-7 w-7 absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full' onClick={clearSearch}>
+                                    <X className='h-4 w-4 text-muted-foreground'/>
+                                </Button>
+                            )}
+                        </div>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-[var(--radix-popover-trigger-width)] p-0' onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <SearchResults users={filteredUsers} onResultClick={handleResultClick} />
+                    </PopoverContent>
+                </Popover>
+            )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -136,7 +141,7 @@ export function Header() {
               </DropdownMenu>
             </>
           ) : (
-             <Button onClick={() => router.push('/login')}>Log In</Button>
+             !appLoading && <Button onClick={() => router.push('/login')}>Log In</Button>
           )}
         </div>
       </div>
