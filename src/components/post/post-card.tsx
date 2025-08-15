@@ -166,16 +166,20 @@ export function PostCard({ post }: { post: PostType }) {
                 <div className="flex gap-2">
                     <Button variant="ghost" size="icon" onClick={handleLike}>
                         <Heart className={cn('h-6 w-6 transition-all duration-200 ease-in-out', post.isLiked ? 'fill-destructive text-destructive' : 'text-foreground')} />
+                        <span className="sr-only">Like post</span>
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => document.getElementById(`comment-input-${post.id}`)?.focus()}>
                         <MessageCircle className="h-6 w-6" />
+                        <span className="sr-only">Comment on post</span>
                     </Button>
                      <Button variant="ghost" size="icon" onClick={handleShare}>
                         <Send className="h-6 w-6" />
+                        <span className="sr-only">Share post</span>
                     </Button>
                 </div>
                 <Button variant="ghost" size="icon" onClick={handleSave}>
                     <Bookmark className={cn('h-6 w-6 transition-all duration-200 ease-in-out', post.isSaved ? 'fill-foreground text-foreground' : 'text-foreground')} />
+                    <span className="sr-only">Save post</span>
                 </Button>
             </div>
 
